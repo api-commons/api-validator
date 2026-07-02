@@ -13,7 +13,7 @@ import builtinMetaRaw from './builtin-meta.json';
 import { listAccessibleRepos, loadRepos, addRepo, removeRepo, type Repo } from './repos';
 import { commitGitHub, openPrGitHub } from './git';
 import { utilitiesFor } from './utilities';
-import { renderDocs as renderDocsHtml, standaloneDocs, DOCS_CSS } from './docs';
+import { renderDocs as renderDocsHtml, renderDocsMarkdown, standaloneDocs, DOCS_CSS } from './docs';
 import { buildApisJson } from './apisjson';
 import { initEngage } from './engage';
 import './style.css';
@@ -1006,6 +1006,11 @@ $('#docs-download-html').addEventListener('click', () => {
   const { html, error } = renderDocsHtml(current.format, docEditor.getValue());
   if (error) { window.alert(error); return; }
   downloadFile(`${currentDocName()}-docs.html`, standaloneDocs(currentDocName(), html), 'text/html');
+});
+$('#docs-download-md').addEventListener('click', () => {
+  const { markdown, error } = renderDocsMarkdown(current.format, docEditor.getValue());
+  if (error) { window.alert(error); return; }
+  downloadFile(`${currentDocName()}-docs.md`, markdown, 'text/markdown');
 });
 $('#docs-print').addEventListener('click', () => {
   const { html, error } = renderDocsHtml(current.format, docEditor.getValue());

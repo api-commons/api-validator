@@ -1,31 +1,60 @@
 // Human-readable documentation generator for the four supported artifact types.
 // Parses the current document and renders it as HTML (for the Docs tab preview and
-// a standalone download) and Markdown (for download). No external deps.
+// a standalone download) and Markdown (for download). Internal $refs are resolved
+// inline (with cycle protection) and description fields are rendered as Markdown.
 import { parse as parseYaml } from 'yaml';
 
 const isObj = (x: any): x is Record<string, any> => x != null && typeof x === 'object' && !Array.isArray(x);
 const esc = (s: any): string =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-// Render a description block: escape, keep paragraph breaks.
-const desc = (s: any): string => {
-  const t = String(s ?? '').trim();
-  if (!t) return '';
-  return `<div class="doc-desc">${t.split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('')}</div>`;
-};
 const METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
 const anchor = (s: string) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-// ---- schema type labelling + property tables --------------------------------
-function refName(ref: string): string { return String(ref).split('/').pop() || 'ref'; }
+// ---- minimal, safe Markdown (descriptions) ----------------------------------
+// Inline formatting applied to ALREADY HTML-escaped text.
+function mdInline(escaped: string): string {
+  return escaped
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+// Inline-only Markdown for a table cell (newlines flattened).
+const inlineMd = (raw: any): string => mdInline(esc(String(raw ?? '').replace(/\s*\n\s*/g, ' ')).trim());
+// Block Markdown for a description: paragraphs, lists, and headings.
+function md(raw: any): string {
+  const t = String(raw ?? '').trim();
+  if (!t) return '';
+  const body = esc(t).split(/\n{2,}/).map((block) => {
+    const lines = block.split('\n');
+    if (lines.every((l) => /^\s*[-*]\s+/.test(l))) return `<ul>${lines.map((l) => `<li>${mdInline(l.replace(/^\s*[-*]\s+/, ''))}</li>`).join('')}</ul>`;
+    if (lines.every((l) => /^\s*\d+\.\s+/.test(l))) return `<ol>${lines.map((l) => `<li>${mdInline(l.replace(/^\s*\d+\.\s+/, ''))}</li>`).join('')}</ol>`;
+    const h = /^(#{1,4})\s+(.*)$/.exec(lines[0]);
+    if (h && lines.length === 1) { const lvl = Math.min(6, h[1].length + 2); return `<h${lvl}>${mdInline(h[2])}</h${lvl}>`; }
+    return `<p>${lines.map(mdInline).join('<br>')}</p>`;
+  }).join('');
+  return `<div class="doc-desc">${body}</div>`;
+}
+
+// ---- $ref resolution + schema labelling -------------------------------------
+const refName = (ref: string): string => String(ref).split('/').pop() || 'ref';
+function resolveRef(root: any, ref: any): any {
+  if (typeof ref !== 'string' || !ref.startsWith('#/')) return undefined;
+  let cur = root;
+  for (const seg of ref.slice(2).split('/').map((s) => s.replace(/~1/g, '/').replace(/~0/g, '~'))) {
+    cur = cur?.[seg];
+    if (cur === undefined) return undefined;
+  }
+  return cur;
+}
 function typeLabel(s: any): string {
   if (!isObj(s)) return '';
   if (s.$ref) return refName(s.$ref);
   if (Array.isArray(s.type)) return s.type.join(' | ');
   if (s.enum) return `enum(${s.enum.map((e: any) => JSON.stringify(e)).join(', ')})`;
-  const t = s.type;
-  if (t === 'array') { const it = s.items ? typeLabel(s.items) : 'any'; return `array<${it}>`; }
-  if (s.oneOf || s.anyOf || s.allOf) return (s.oneOf ? 'oneOf' : s.anyOf ? 'anyOf' : 'allOf');
-  return t || (s.properties ? 'object' : '');
+  if (s.type === 'array') return `array<${s.items ? typeLabel(s.items) : 'any'}>`;
+  if (s.oneOf) return 'oneOf'; if (s.anyOf) return 'anyOf'; if (s.allOf) return 'allOf';
+  return s.type || (s.properties ? 'object' : '');
 }
 function constraints(s: any): string {
   if (!isObj(s)) return '';
@@ -34,25 +63,45 @@ function constraints(s: any): string {
     if (s[k] !== undefined) c.push(`${k}: ${typeof s[k] === 'object' ? JSON.stringify(s[k]) : s[k]}`);
   return c.length ? `<div class="doc-constraints">${esc(c.join(' · '))}</div>` : '';
 }
-// Recursive property table for an object schema.
-function schemaTable(schema: any, depth = 0): string {
+// The object schema (with properties) a schema resolves to, chasing $ref and array
+// items. Returns undefined if it's not an object-with-properties.
+function objSchema(s: any, root: any): any {
+  let cur = s, guard = 0;
+  while (isObj(cur) && cur.$ref && guard++ < 12) cur = resolveRef(root, cur.$ref);
+  if (isObj(cur) && cur.type === 'array') { cur = cur.items; guard = 0; while (isObj(cur) && cur.$ref && guard++ < 12) cur = resolveRef(root, cur.$ref); }
+  return isObj(cur) && isObj(cur.properties) ? cur : undefined;
+}
+
+// Recursive property table. Resolves internal $refs inline; `seen` guards cycles.
+function schemaTable(schema: any, root: any, depth = 0, seen: Set<string> = new Set()): string {
   if (!isObj(schema)) return '';
-  if (schema.$ref) return `<p class="doc-ref">→ <code>${esc(refName(schema.$ref))}</code></p>`;
+  if (schema.$ref) {
+    const name = refName(schema.$ref);
+    const target = resolveRef(root, schema.$ref);
+    if (!target || seen.has(schema.$ref) || depth > 5) return `<p class="doc-ref">→ <code>${esc(name)}</code></p>`;
+    seen.add(schema.$ref);
+    const inner = schemaTable(target, root, depth + 1, seen);
+    seen.delete(schema.$ref);
+    return `<div class="doc-ref-expand"><div class="doc-ref-name"><code>${esc(name)}</code></div>${inner}</div>`;
+  }
   const props = schema.properties;
   if (!isObj(props)) {
-    // Non-object schema: describe it inline.
+    for (const comb of ['allOf', 'oneOf', 'anyOf'] as const)
+      if (Array.isArray(schema[comb])) return `<div class="doc-comb"><span class="doc-comb-label">${comb}</span>${schema[comb].map((s: any) => schemaTable(s, root, depth + 1, seen)).join('')}</div>`;
     const t = typeLabel(schema);
-    return `<p class="doc-inline-type">${t ? `<code>${esc(t)}</code>` : ''}${desc(schema.description)}</p>${constraints(schema)}`;
+    return `<p class="doc-inline-type">${t ? `<code>${esc(t)}</code>` : ''}${md(schema.description)}</p>${constraints(schema)}`;
   }
   const required: string[] = Array.isArray(schema.required) ? schema.required : [];
   const rows = Object.entries<any>(props).map(([name, p]) => {
-    const nested = depth < 3 && isObj(p) && !p.$ref && (isObj(p.properties) || (p.type === 'array' && isObj(p.items?.properties)))
-      ? `<div class="doc-nested">${schemaTable(p.type === 'array' ? p.items : p, depth + 1)}</div>`
+    const refKey = isObj(p) ? (p.$ref || (p.type === 'array' && p.items?.$ref) || '') : '';
+    const obj = depth < 5 ? objSchema(p, root) : undefined;
+    const nested = obj && !(refKey && seen.has(refKey))
+      ? (() => { if (refKey) seen.add(refKey); const h = `<div class="doc-nested">${schemaTable(obj, root, depth + 1, seen)}</div>`; if (refKey) seen.delete(refKey); return h; })()
       : '';
     return `<tr>
       <td class="doc-pname"><code>${esc(name)}</code>${required.includes(name) ? '<span class="doc-req" title="required">*</span>' : ''}</td>
       <td class="doc-ptype"><code>${esc(typeLabel(p))}</code></td>
-      <td class="doc-pdesc">${isObj(p) ? (desc(p.description) || '') : ''}${constraints(p)}${nested}</td>
+      <td class="doc-pdesc">${isObj(p) ? inlineMd(p.description) : ''}${constraints(p)}${nested}</td>
     </tr>`;
   }).join('');
   return `<table class="doc-table"><thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -62,19 +111,17 @@ function pageHeader(title: string, version: any, description: any, kind: string)
   return `<header class="doc-header">
     <div class="doc-kind">${esc(kind)}</div>
     <h1>${esc(title || 'Untitled')}${version ? ` <span class="doc-version">v${esc(version)}</span>` : ''}</h1>
-    ${desc(description)}
+    ${md(description)}
   </header>`;
 }
-function section(title: string, body: string, id?: string): string {
-  if (!body) return '';
-  return `<section class="doc-section"${id ? ` id="${esc(id)}"` : ''}><h2>${esc(title)}</h2>${body}</section>`;
-}
+const section = (title: string, body: string, id?: string): string =>
+  body ? `<section class="doc-section"${id ? ` id="${esc(id)}"` : ''}><h2>${esc(title)}</h2>${body}</section>` : '';
 
 // ---- OpenAPI ----------------------------------------------------------------
 function renderOpenAPI(d: any): string {
   const parts: string[] = [pageHeader(d.info?.title, d.info?.version, d.info?.description, 'OpenAPI ' + (d.openapi || d.swagger || ''))];
   if (Array.isArray(d.servers) && d.servers.length)
-    parts.push(section('Servers', `<ul class="doc-list">${d.servers.map((s: any) => `<li><code>${esc(s.url)}</code>${s.description ? ` — ${esc(s.description)}` : ''}</li>`).join('')}</ul>`));
+    parts.push(section('Servers', `<ul class="doc-list">${d.servers.map((s: any) => `<li><code>${esc(s.url)}</code>${s.description ? ` — ${inlineMd(s.description)}` : ''}</li>`).join('')}</ul>`));
 
   const paths = isObj(d.paths) ? d.paths : {};
   const ops: Array<{ path: string; method: string; op: any }> = [];
@@ -84,21 +131,18 @@ function renderOpenAPI(d: any): string {
   const opCard = ({ path, method, op }: { path: string; method: string; op: any }) => {
     const params = [...(paths[path].parameters || []), ...(op.parameters || [])];
     const paramRows = params.length ? `<h4>Parameters</h4><table class="doc-table"><thead><tr><th>Name</th><th>In</th><th>Type</th><th>Req</th><th>Description</th></tr></thead><tbody>${
-      params.map((pa: any) => `<tr><td><code>${esc(pa.name)}</code></td><td>${esc(pa.in)}</td><td><code>${esc(typeLabel(pa.schema || pa))}</code></td><td>${pa.required ? 'yes' : ''}</td><td>${esc(pa.description || '')}</td></tr>`).join('')
+      params.map((pa: any) => `<tr><td><code>${esc(pa.name)}</code></td><td>${esc(pa.in)}</td><td><code>${esc(typeLabel(pa.schema || pa))}</code></td><td>${pa.required ? 'yes' : ''}</td><td>${inlineMd(pa.description)}</td></tr>`).join('')
     }</tbody></table>` : '';
-    const body = op.requestBody?.content ? `<h4>Request body</h4>${Object.entries<any>(op.requestBody.content).map(([ct, mt]) => `<div class="doc-media"><code>${esc(ct)}</code>${schemaTable(mt.schema || {})}</div>`).join('')}` : '';
-    const responses = isObj(op.responses) ? `<h4>Responses</h4><table class="doc-table"><thead><tr><th>Status</th><th>Description</th><th>Content</th></tr></thead><tbody>${
-      Object.entries<any>(op.responses).map(([code, r]) => `<tr><td><code>${esc(code)}</code></td><td>${esc(r?.description || '')}</td><td>${r?.content ? Object.keys(r.content).map((c) => `<code>${esc(c)}</code>`).join(' ') : ''}</td></tr>`).join('')
-    }</tbody></table>` : '';
+    const body = op.requestBody?.content ? `<h4>Request body</h4>${Object.entries<any>(op.requestBody.content).map(([ct, mt]) => `<div class="doc-media"><code>${esc(ct)}</code>${schemaTable(mt.schema || {}, d)}</div>`).join('')}` : '';
+    const responses = isObj(op.responses) ? `<h4>Responses</h4>${Object.entries<any>(op.responses).map(([code, r]) => `<div class="doc-resp"><span class="doc-status">${esc(code)}</span> ${inlineMd(r?.description)}${r?.content ? Object.entries<any>(r.content).map(([ct, mt]) => `<div class="doc-media"><code>${esc(ct)}</code>${schemaTable(mt.schema || {}, d)}</div>`).join('') : ''}</div>`).join('')}` : '';
     return `<div class="doc-op" id="op-${esc(anchor(method + '-' + path))}">
       <div class="doc-op-head"><span class="doc-method doc-m-${esc(method)}">${esc(method.toUpperCase())}</span><code class="doc-path">${esc(path)}</code></div>
       ${op.summary ? `<div class="doc-summary">${esc(op.summary)}</div>` : ''}
       ${op.operationId ? `<div class="doc-opid">operationId: <code>${esc(op.operationId)}</code></div>` : ''}
-      ${desc(op.description)}${paramRows}${body}${responses}
+      ${md(op.description)}${paramRows}${body}${responses}
     </div>`;
   };
 
-  // Group operations by first tag (fallback: "default").
   const groups = new Map<string, typeof ops>();
   for (const o of ops) { const tag = o.op.tags?.[0] || 'default'; (groups.get(tag) ?? groups.set(tag, []).get(tag)!).push(o); }
   const opsHtml = [...groups.entries()].map(([tag, list]) =>
@@ -108,7 +152,7 @@ function renderOpenAPI(d: any): string {
   const schemas = d.components?.schemas;
   if (isObj(schemas))
     parts.push(section(`Schemas (${Object.keys(schemas).length})`, Object.entries<any>(schemas).map(([n, s]) =>
-      `<div class="doc-schema" id="schema-${esc(anchor(n))}"><h3><code>${esc(n)}</code></h3>${desc(s.description)}${schemaTable(s)}</div>`).join(''), 'schemas'));
+      `<div class="doc-schema" id="schema-${esc(anchor(n))}"><h3><code>${esc(n)}</code></h3>${md(s.description)}${schemaTable(s, d)}</div>`).join(''), 'schemas'));
   return parts.join('');
 }
 
@@ -116,25 +160,24 @@ function renderOpenAPI(d: any): string {
 function renderAsyncAPI(d: any): string {
   const parts: string[] = [pageHeader(d.info?.title, d.info?.version, d.info?.description, 'AsyncAPI ' + (d.asyncapi || ''))];
   if (isObj(d.servers))
-    parts.push(section('Servers', `<ul class="doc-list">${Object.entries<any>(d.servers).map(([n, s]) => `<li><strong>${esc(n)}</strong> — <code>${esc(s.url || s.host || '')}</code>${s.protocol ? ` (${esc(s.protocol)})` : ''}${s.description ? ` — ${esc(s.description)}` : ''}</li>`).join('')}</ul>`));
+    parts.push(section('Servers', `<ul class="doc-list">${Object.entries<any>(d.servers).map(([n, s]) => `<li><strong>${esc(n)}</strong> — <code>${esc(s.url || s.host || '')}</code>${s.protocol ? ` (${esc(s.protocol)})` : ''}${s.description ? ` — ${inlineMd(s.description)}` : ''}</li>`).join('')}</ul>`));
 
   const channels = isObj(d.channels) ? d.channels : {};
   const chHtml = Object.entries<any>(channels).map(([name, ch]) => {
-    // AsyncAPI 2.x: subscribe/publish operations with a message. 3.x: messages map.
     const opBlocks = ['subscribe', 'publish'].filter((k) => isObj(ch?.[k])).map((k) => {
       const op = ch[k];
       const payload = op.message?.payload || op.message?.oneOf;
-      return `<div class="doc-op"><div class="doc-op-head"><span class="doc-method doc-m-${k === 'publish' ? 'post' : 'get'}">${k.toUpperCase()}</span></div>${desc(op.summary || op.description)}${payload ? `<h4>Message payload</h4>${schemaTable(payload)}` : ''}</div>`;
+      return `<div class="doc-op"><div class="doc-op-head"><span class="doc-method doc-m-${k === 'publish' ? 'post' : 'get'}">${k.toUpperCase()}</span></div>${md(op.summary || op.description)}${payload ? `<h4>Message payload</h4>${schemaTable(payload, d)}` : ''}</div>`;
     }).join('');
-    const messages = isObj(ch?.messages) ? `<h4>Messages</h4>${Object.entries<any>(ch.messages).map(([mn, m]) => `<div class="doc-media"><strong>${esc(mn)}</strong>${desc(m.summary || m.description)}${m.payload ? schemaTable(m.payload) : ''}</div>`).join('')}` : '';
-    return `<div class="doc-channel"><h3><code>${esc(ch.address || name)}</code></h3>${desc(ch.description)}${opBlocks}${messages}</div>`;
+    const messages = isObj(ch?.messages) ? `<h4>Messages</h4>${Object.entries<any>(ch.messages).map(([mn, m]) => `<div class="doc-media"><strong>${esc(mn)}</strong>${md(m.summary || m.description)}${m.payload ? schemaTable(m.payload, d) : ''}</div>`).join('')}` : '';
+    return `<div class="doc-channel"><h3><code>${esc(ch.address || name)}</code></h3>${md(ch.description)}${opBlocks}${messages}</div>`;
   }).join('');
   parts.push(section(`Channels (${Object.keys(channels).length})`, chHtml, 'channels'));
 
   const schemas = d.components?.schemas;
   if (isObj(schemas))
     parts.push(section(`Schemas (${Object.keys(schemas).length})`, Object.entries<any>(schemas).map(([n, s]) =>
-      `<div class="doc-schema"><h3><code>${esc(n)}</code></h3>${desc(s.description)}${schemaTable(s)}</div>`).join('')));
+      `<div class="doc-schema"><h3><code>${esc(n)}</code></h3>${md(s.description)}${schemaTable(s, d)}</div>`).join('')));
   return parts.join('');
 }
 
@@ -146,11 +189,11 @@ function renderJsonSchema(d: any): string {
   if (d.$id) meta.push(`<li>$id: <code>${esc(d.$id)}</code></li>`);
   if (d.type) meta.push(`<li>type: <code>${esc(Array.isArray(d.type) ? d.type.join(' | ') : d.type)}</code></li>`);
   if (meta.length) parts.push(section('Schema', `<ul class="doc-list">${meta.join('')}</ul>`));
-  if (isObj(d.properties)) parts.push(section('Properties', schemaTable(d)));
+  if (isObj(d.properties)) parts.push(section('Properties', schemaTable(d, d)));
   const defs = d.$defs || d.definitions;
   if (isObj(defs))
     parts.push(section(`Definitions (${Object.keys(defs).length})`, Object.entries<any>(defs).map(([n, s]) =>
-      `<div class="doc-schema"><h3><code>${esc(n)}</code></h3>${desc(s.description)}${schemaTable(s)}</div>`).join('')));
+      `<div class="doc-schema"><h3><code>${esc(n)}</code></h3>${md(s.description)}${schemaTable(s, d)}</div>`).join('')));
   return parts.join('');
 }
 
@@ -162,14 +205,14 @@ function renderArazzo(d: any): string {
 
   const workflows = Array.isArray(d.workflows) ? d.workflows : [];
   const wfHtml = workflows.map((w: any) => {
-    const inputs = isObj(w.inputs) ? `<h4>Inputs</h4>${schemaTable(w.inputs)}` : '';
+    const inputs = isObj(w.inputs) ? `<h4>Inputs</h4>${schemaTable(w.inputs, d)}` : '';
     const steps = Array.isArray(w.steps) ? `<h4>Steps (${w.steps.length})</h4><ol class="doc-steps">${w.steps.map((st: any) => `<li>
         <div class="doc-step-id"><code>${esc(st.stepId || '')}</code>${st.operationId ? ` → <code>${esc(st.operationId)}</code>` : st.operationPath ? ` → <code>${esc(st.operationPath)}</code>` : st.workflowId ? ` → workflow <code>${esc(st.workflowId)}</code>` : ''}</div>
-        ${desc(st.description)}
+        ${md(st.description)}
         ${Array.isArray(st.parameters) && st.parameters.length ? `<div class="doc-step-params">params: ${st.parameters.map((p: any) => `<code>${esc(p.name)}</code>`).join(', ')}</div>` : ''}
         ${Array.isArray(st.successCriteria) && st.successCriteria.length ? `<div class="doc-step-crit">success: ${st.successCriteria.map((c: any) => `<code>${esc(c.condition || c)}</code>`).join(', ')}</div>` : ''}
       </li>`).join('')}</ol>` : '';
-    return `<div class="doc-workflow"><h3><code>${esc(w.workflowId || 'workflow')}</code></h3>${w.summary ? `<div class="doc-summary">${esc(w.summary)}</div>` : ''}${desc(w.description)}${inputs}${steps}</div>`;
+    return `<div class="doc-workflow"><h3><code>${esc(w.workflowId || 'workflow')}</code></h3>${w.summary ? `<div class="doc-summary">${esc(w.summary)}</div>` : ''}${md(w.description)}${inputs}${steps}</div>`;
   }).join('');
   parts.push(section(`Workflows (${workflows.length})`, wfHtml, 'workflows'));
   return parts.join('');
@@ -181,14 +224,101 @@ const RENDERERS: Record<string, (d: any) => string> = {
 
 export interface DocsResult { html: string; error?: string; }
 
-// Render the document text as documentation HTML for the given artifact format.
-export function renderDocs(format: string, text: string): DocsResult {
+function parse(text: string): { d?: any; error?: string } {
   let d: any;
-  try { d = parseYaml(text); } catch (e) { return { html: '', error: `Could not parse the document: ${e instanceof Error ? e.message : String(e)}` }; }
-  if (!isObj(d)) return { html: '', error: 'The document is empty or not an object.' };
+  try { d = parseYaml(text); } catch (e) { return { error: `Could not parse the document: ${e instanceof Error ? e.message : String(e)}` }; }
+  if (!isObj(d)) return { error: 'The document is empty or not an object.' };
+  return { d };
+}
+
+export function renderDocs(format: string, text: string): DocsResult {
+  const { d, error } = parse(text);
+  if (error) return { html: '', error };
   const fn = RENDERERS[format];
   if (!fn) return { html: '', error: `No documentation renderer for “${format}”.` };
   try { return { html: fn(d) }; } catch (e) { return { html: '', error: `Could not render documentation: ${e instanceof Error ? e.message : String(e)}` }; }
+}
+
+// ---- Markdown output --------------------------------------------------------
+const mdCell = (s: any): string => String(s ?? '').replace(/\s*\n\s*/g, ' ').replace(/\|/g, '\\|').trim();
+// Flat property table (one level; top-level $ref resolved) as a Markdown table.
+function mdProps(schema: any, root: any): string {
+  let s = schema;
+  let guard = 0;
+  while (isObj(s) && s.$ref && guard++ < 12) s = resolveRef(root, s.$ref) || s;
+  if (!isObj(s) || !isObj(s.properties)) { const t = typeLabel(s); return t ? `Type: \`${t}\`\n\n` : ''; }
+  const req: string[] = Array.isArray(s.required) ? s.required : [];
+  let out = '| Property | Type | Required | Description |\n|---|---|---|---|\n';
+  for (const [n, p] of Object.entries<any>(s.properties))
+    out += `| \`${n}\` | \`${typeLabel(p)}\` | ${req.includes(n) ? 'yes' : ''} | ${mdCell(isObj(p) ? p.description : '')} |\n`;
+  return out + '\n';
+}
+function mdOpenAPI(d: any): string {
+  const L: string[] = [`# ${d.info?.title || 'Untitled'}${d.info?.version ? ` v${d.info.version}` : ''}`, ''];
+  if (d.info?.description) L.push(d.info.description, '');
+  if (Array.isArray(d.servers) && d.servers.length) { L.push('## Servers', ''); for (const s of d.servers) L.push(`- \`${s.url}\`${s.description ? ` — ${mdCell(s.description)}` : ''}`); L.push(''); }
+  const paths = isObj(d.paths) ? d.paths : {};
+  L.push('## Operations', '');
+  for (const [p, item] of Object.entries<any>(paths)) for (const [m, op] of Object.entries<any>(item || {})) {
+    if (!METHODS.includes(m) || !isObj(op)) continue;
+    L.push(`### \`${m.toUpperCase()} ${p}\``, '');
+    if (op.summary) L.push(`**${mdCell(op.summary)}**`, '');
+    if (op.operationId) L.push(`operationId: \`${op.operationId}\``, '');
+    if (op.description) L.push(op.description, '');
+    const params = [...(paths[p].parameters || []), ...(op.parameters || [])];
+    if (params.length) { L.push('**Parameters**', '', '| Name | In | Type | Req | Description |', '|---|---|---|---|---|'); for (const pa of params) L.push(`| \`${pa.name}\` | ${pa.in} | \`${typeLabel(pa.schema || pa)}\` | ${pa.required ? 'yes' : ''} | ${mdCell(pa.description)} |`); L.push(''); }
+    if (isObj(op.responses)) { L.push('**Responses**', '', '| Status | Description |', '|---|---|'); for (const [code, r] of Object.entries<any>(op.responses)) L.push(`| \`${code}\` | ${mdCell(r?.description)} |`); L.push(''); }
+  }
+  const schemas = d.components?.schemas;
+  if (isObj(schemas)) { L.push('## Schemas', ''); for (const [n, s] of Object.entries<any>(schemas)) { L.push(`### \`${n}\``, ''); if (s.description) L.push(mdCell(s.description), ''); L.push(mdProps(s, d)); } }
+  return L.join('\n');
+}
+function mdAsyncAPI(d: any): string {
+  const L: string[] = [`# ${d.info?.title || 'Untitled'}${d.info?.version ? ` v${d.info.version}` : ''}`, ''];
+  if (d.info?.description) L.push(d.info.description, '');
+  const channels = isObj(d.channels) ? d.channels : {};
+  L.push('## Channels', '');
+  for (const [name, ch] of Object.entries<any>(channels)) {
+    L.push(`### \`${ch.address || name}\``, '');
+    if (ch.description) L.push(mdCell(ch.description), '');
+    for (const k of ['subscribe', 'publish']) if (isObj(ch?.[k])) { L.push(`**${k}**`, ''); const pl = ch[k].message?.payload; if (pl) L.push(mdProps(pl, d)); }
+    if (isObj(ch?.messages)) for (const [mn, m] of Object.entries<any>(ch.messages)) { L.push(`**Message: ${mn}**`, ''); if (m.payload) L.push(mdProps(m.payload, d)); }
+  }
+  const schemas = d.components?.schemas;
+  if (isObj(schemas)) { L.push('## Schemas', ''); for (const [n, s] of Object.entries<any>(schemas)) { L.push(`### \`${n}\``, ''); L.push(mdProps(s, d)); } }
+  return L.join('\n');
+}
+function mdJsonSchema(d: any): string {
+  const L: string[] = [`# ${d.title || 'JSON Schema'}`, ''];
+  if (d.description) L.push(d.description, '');
+  if (d.type) L.push(`type: \`${Array.isArray(d.type) ? d.type.join(' | ') : d.type}\``, '');
+  if (isObj(d.properties)) { L.push('## Properties', ''); L.push(mdProps(d, d)); }
+  const defs = d.$defs || d.definitions;
+  if (isObj(defs)) { L.push('## Definitions', ''); for (const [n, s] of Object.entries<any>(defs)) { L.push(`### \`${n}\``, ''); L.push(mdProps(s, d)); } }
+  return L.join('\n');
+}
+function mdArazzo(d: any): string {
+  const L: string[] = [`# ${d.info?.title || 'Arazzo'}${d.info?.version ? ` v${d.info.version}` : ''}`, ''];
+  if (d.info?.summary || d.info?.description) L.push(d.info.summary || d.info.description, '');
+  if (Array.isArray(d.sourceDescriptions) && d.sourceDescriptions.length) { L.push('## Source descriptions', ''); for (const s of d.sourceDescriptions) L.push(`- **${s.name}** (${s.type || 'openapi'}) — \`${s.url}\``); L.push(''); }
+  L.push('## Workflows', '');
+  for (const w of (Array.isArray(d.workflows) ? d.workflows : [])) {
+    L.push(`### \`${w.workflowId || 'workflow'}\``, '');
+    if (w.summary) L.push(`**${mdCell(w.summary)}**`, '');
+    if (w.description) L.push(w.description, '');
+    if (Array.isArray(w.steps)) { L.push('**Steps**', ''); for (const st of w.steps) L.push(`1. \`${st.stepId || ''}\`${st.operationId ? ` → \`${st.operationId}\`` : st.operationPath ? ` → \`${st.operationPath}\`` : st.workflowId ? ` → workflow \`${st.workflowId}\`` : ''}${st.description ? ` — ${mdCell(st.description)}` : ''}`); L.push(''); }
+  }
+  return L.join('\n');
+}
+const MD_RENDERERS: Record<string, (d: any) => string> = {
+  openapi: mdOpenAPI, asyncapi: mdAsyncAPI, jsonschema: mdJsonSchema, arazzo: mdArazzo,
+};
+export function renderDocsMarkdown(format: string, text: string): { markdown: string; error?: string } {
+  const { d, error } = parse(text);
+  if (error) return { markdown: '', error };
+  const fn = MD_RENDERERS[format];
+  if (!fn) return { markdown: '', error: `No documentation renderer for “${format}”.` };
+  try { return { markdown: fn(d) }; } catch (e) { return { markdown: '', error: `Could not render documentation: ${e instanceof Error ? e.message : String(e)}` }; }
 }
 
 // The stylesheet used both in the app (scoped by .doc-view) and the standalone
@@ -202,6 +332,7 @@ export const DOCS_CSS = `
 .doc-version { font-size: 0.9rem; color: #666; font-weight: 500; }
 .doc-desc { color: #333; }
 .doc-desc p { margin: 0.4rem 0; }
+.doc-desc ul, .doc-desc ol { margin: 0.4rem 0; padding-left: 1.3rem; }
 .doc-section { margin: 1.5rem 0; }
 .doc-section > h2 { font-size: 1.25rem; border-bottom: 1px solid #eee; padding-bottom: 0.3rem; }
 .doc-list { margin: 0.4rem 0; padding-left: 1.2rem; }
@@ -221,6 +352,12 @@ export const DOCS_CSS = `
 .doc-req { color: #dc3545; font-weight: 700; }
 .doc-constraints { font-size: 0.8rem; color: #888; margin-top: 2px; }
 .doc-nested { margin-top: 0.4rem; padding-left: 0.6rem; border-left: 2px solid #e3e7ee; }
+.doc-ref-expand { margin: 0.2rem 0; }
+.doc-ref-name { font-size: 0.82rem; color: #0d6efd; margin-bottom: 2px; }
+.doc-comb { margin: 0.3rem 0; padding-left: 0.6rem; border-left: 2px dashed #cbd3df; }
+.doc-comb-label { font-size: 0.75rem; text-transform: uppercase; color: #888; font-weight: 700; }
+.doc-resp { margin: 0.3rem 0; }
+.doc-status { display: inline-block; font-weight: 700; font-family: ui-monospace, Menlo, monospace; background: #eef1f5; padding: 1px 6px; border-radius: 3px; margin-right: 0.4rem; }
 .doc-schema, .doc-channel, .doc-workflow { margin: 1rem 0; }
 .doc-schema h3, .doc-channel h3, .doc-workflow h3 { font-size: 1rem; }
 .doc-steps { padding-left: 1.2rem; }
@@ -230,7 +367,6 @@ export const DOCS_CSS = `
 .doc-view code { background: #eef1f5; padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
 `;
 
-// A fully self-contained HTML document for download.
 export function standaloneDocs(title: string, inner: string): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
