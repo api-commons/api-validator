@@ -16,14 +16,14 @@
       </div>
       <nav>
         <a href="https://apicommons.org/tools/" target="_blank" rel="noopener">API Commons</a>
-        <a class="gh-btn" href="https://github.com/api-commons/api-validator/fork" target="_blank" rel="noopener" title="Fork this project on GitHub">
+        <a class="btn-yellow" href="https://github.com/api-commons/api-validator/fork" target="_blank" rel="noopener" title="Fork this project on GitHub">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
           Fork on GitHub
         </a>
-        <button id="engage-ae" class="engage-btn" type="button" title="Work with API Evangelist on a governance review or service">Get a review</button>
-        <a id="run-local" class="dl-btn" href="/api-validator.zip" download="api-validator.zip" title="Download the built app as a zip and run it on your own machine">Run Locally</a>
-        <button id="download-apisjson" class="reset-btn" type="button" title="Assemble all saved artifacts into an APIs.json (YAML) and download">Download as APIs.json</button>
-        <button id="reset-storage" class="reset-btn" type="button" title="Clear all saved artifacts and rules stored in this browser">Reset</button>
+        <button id="engage-ae" class="btn-yellow" type="button" title="Work with API Evangelist on a governance review or service">Get a review</button>
+        <a id="run-local" class="btn-yellow" href="/api-validator.zip" download="api-validator.zip" title="Download the built app as a zip and run it on your own machine">Run Locally</a>
+        <button id="download-apisjson" class="btn-yellow" type="button" title="Assemble all saved artifacts into an APIs.json (YAML) and download">Download as APIs.json</button>
+        <button id="reset-storage" class="btn-yellow" type="button" title="Clear all saved artifacts and rules stored in this browser">Reset</button>
       </nav>
     </header>
 
@@ -41,6 +41,8 @@
             <button id="lang-yaml" class="active" type="button">YAML</button>
             <button id="lang-json" type="button">JSON</button>
           </div>
+          <button id="doc-upload" class="upload-btn" type="button" title="Upload a YAML or JSON artifact from your computer">Upload</button>
+          <input id="doc-file" type="file" accept=".yaml,.yml,.json,.md,.txt,application/json,text/yaml" hidden />
           <button id="doc-save" class="save-btn" type="button" title="Save to this browser's local storage">Save</button>
         </div>
         <div id="doc-status" class="muted small doc-status"></div>

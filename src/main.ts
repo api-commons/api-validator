@@ -894,6 +894,42 @@ function saveCurrent() {
 }
 $('#doc-save').addEventListener('click', saveCurrent);
 
+// ---- upload an artifact from disk -------------------------------------------
+// Detect the artifact type from a parsed document's marker keys; null = unknown.
+function detectArtifactType(text: string): string | null {
+  let d: any;
+  try { d = parseYaml(text); } catch { return null; }
+  if (!d || typeof d !== 'object') return null;
+  if (d.openapi || d.swagger) return 'openapi';
+  if (d.asyncapi) return 'asyncapi';
+  if (d.arazzo) return 'arazzo';
+  if (d.$schema || d.$defs || d.definitions || d.properties || d.$id) return 'json-schema';
+  return null;
+}
+const fileInput = $<HTMLInputElement>('#doc-file');
+$('#doc-upload').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const head = (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).trimStart();
+    const lang: 'yaml' | 'json' = /\.json$/i.test(file.name) || head.startsWith('{') || head.startsWith('[') ? 'json' : 'yaml';
+    const type = detectArtifactType(text) ?? current.id; // fall back to the current type
+    const name = file.name.replace(/\.(ya?ml|json|md|txt)$/i, '') || `Uploaded ${artifactById(type).label}`;
+    let doc = findDoc(type, name);
+    if (doc) Object.assign(doc, { content: text, lang, updatedAt: Date.now() });
+    else doc = { id: newId(), name, type, lang, content: text, updatedAt: Date.now() };
+    upsertDoc(doc);
+    loadDocIntoEditor(doc);
+    switchTab('results');
+  } catch (e) {
+    window.alert(`Could not read that file: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    fileInput.value = ''; // let the same file be re-selected later
+  }
+});
+
 // Download every saved artifact as one APIs.json (0.21, YAML).
 function downloadFile(name: string, text: string, mime = 'application/yaml') {
   const url = URL.createObjectURL(new Blob([text], { type: mime }));
