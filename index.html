@@ -183,7 +183,25 @@
           <button id="modal-close" aria-label="Close">&times;</button>
         </div>
         <p id="rule-note" class="muted small"></p>
-        <div id="rule-editor" class="editor"></div>
+        <div class="rule-fields">
+          <label class="rule-field">
+            <span class="rf-label">Severity</span>
+            <select id="rule-severity">
+              <option value="error">error</option>
+              <option value="warn">warn</option>
+              <option value="info">info</option>
+              <option value="hint">hint</option>
+            </select>
+          </label>
+          <label class="rule-field">
+            <span class="rf-label">Message <span id="rf-message-note" class="rf-note"></span></span>
+            <input id="rule-message" type="text" autocomplete="off" spellcheck="false" placeholder="Text shown on each finding" />
+          </label>
+          <label class="rule-field">
+            <span class="rf-label">Description <span id="rf-desc-note" class="rf-note"></span></span>
+            <textarea id="rule-description" rows="3" spellcheck="false" placeholder="What this rule checks (shown in the tooltip)"></textarea>
+          </label>
+        </div>
         <div class="modal-actions">
           <button id="rule-apply" class="primary">Apply &amp; lint</button>
           <button id="rule-reset">Reset to default</button>

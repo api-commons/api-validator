@@ -113,9 +113,19 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
 .modal-head #modal-close { background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; }
 .modal-head #modal-close:hover { color: var(--fg); }
 .modal-card #rule-note { margin: 0; padding: 0.5rem 0.9rem 0; }
-/* flex: none so the .editor `flex:1; min-height:0` (for the main layout) doesn't
-   zero out flex-basis and collapse this fixed-height modal editor to ~1px. */
-.modal-card #rule-editor { flex: 0 0 320px; height: 320px; margin: 0.5rem 0.9rem; border: 1px solid var(--line); border-radius: 4px; }
+/* three-field rule editor (severity / message / description) */
+.rule-fields { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem 0.9rem; }
+.rule-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.rule-field .rf-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); font-weight: 700; }
+.rule-field .rf-note { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; }
+.rule-field select, .rule-field input, .rule-field textarea {
+  background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
+  padding: 6px 8px; font-size: 0.9rem; font-family: inherit; width: 100%; box-sizing: border-box;
+}
+.rule-field select { max-width: 160px; }
+.rule-field textarea { resize: vertical; min-height: 3.5em; }
+.rule-field input:focus, .rule-field textarea:focus, .rule-field select:focus { outline: none; border-color: var(--accent); }
+.rule-field input:disabled, .rule-field textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 .modal-actions { display: flex; gap: 0.5rem; padding: 0 0.9rem 0.9rem; }
 .modal-actions button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.85rem; }
 .modal-actions button.primary { background: var(--accent); color: #000; border-color: var(--accent); }

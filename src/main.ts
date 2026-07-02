@@ -67,18 +67,6 @@ const docEditor = monaco.editor.create($('#doc-editor'), {
   scrollBeyondLastLine: false,
 });
 
-// Created lazily on first modal open — a Monaco editor created inside a
-// display:none container renders nothing until it has real dimensions.
-let ruleEditor: monaco.editor.IStandaloneCodeEditor | null = null;
-function ensureRuleEditor(): monaco.editor.IStandaloneCodeEditor {
-  if (!ruleEditor) {
-    ruleEditor = monaco.editor.create($('#rule-editor'), {
-      value: '', language: 'yaml', theme: 'vs-dark', automaticLayout: true,
-      minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false,
-    });
-  }
-  return ruleEditor;
-}
 
 const ACRONYMS: Record<string, string> = {
   api: 'API', apis: 'APIs', oas: 'OAS', oas2: 'OAS2', oas3: 'OAS3', aas: 'AAS', url: 'URL', uri: 'URI',
@@ -282,8 +270,17 @@ function activeRulesetDef(): any {
       // "Cannot extend non-existing rule" if an inline rule is set to 'off').
       if (isInline(r.name)) delete rules[r.name];
       else rules[r.name] = 'off';
+    } else if (isInline(r.name)) {
+      // Merge the partial override ({severity, message?, description?}) onto the
+      // full base definition so `given`/`then` survive.
+      const base = rules[r.name] && typeof rules[r.name] === 'object'
+        ? rules[r.name]
+        : engineRule(ALL_RULES[current.format][r.name]);
+      const patch = typeof r.def === 'object' ? r.def : { severity: r.def };
+      rules[r.name] = { ...base, ...patch };
     } else {
-      rules[r.name] = r.def;
+      // Built-in (extended) rule: Spectral only accepts a severity string here.
+      rules[r.name] = sevOf(r.def) ?? 'warn';
     }
   }
 
@@ -535,28 +532,48 @@ function hideLintTip() {
 // ---- rule editor modal ------------------------------------------------------
 let modalRuleName = '';
 let modalRuleFormat = ''; // format the edited rule belongs to (so overrides are scoped)
-function ruleDefForEditing(code: string): any {
-  const saved = getRule(code, modalRuleFormat);
-  if (saved) return saved.def;
-  const r = RULE_INDEX[code];
-  if (r) {
-    const { tags: _t, title: _ti, reference: _re, prompt: _pr, source: _so, _format: _f, ...rest } = r; // hide metadata while editing
-    return rest;
-  }
-  return 'warn'; // built-in rule (from the extended ruleset) — edit as a severity toggle
+// Inline (curated) rules carry a full definition we own; built-in rules come from
+// the extended Spectral ruleset. Only inline rules can have message/description
+// overridden — Spectral rejects a partial override of an inherited built-in rule,
+// so those are severity-only.
+function isInlineRule(code: string, format: string): boolean {
+  const r = (ALL_RULES[format] || {})[code];
+  return !!r && (r as any).source !== 'builtin';
+}
+const sevOf = (def: any): string | undefined => (typeof def === 'string' ? def : def?.severity);
+// The current effective message/description/severity for a rule (a saved override
+// wins over the base definition).
+function effectiveRuleFields(code: string, format: string): { severity: string; message: string; description: string } {
+  const saved = getRule(code, format);
+  const savedDef = saved && saved.def !== 'off' && saved.def !== false ? saved.def : undefined;
+  const base = RULE_INDEX[code] || {};
+  const savedObj = savedDef && typeof savedDef === 'object' ? savedDef : {};
+  return {
+    severity: sevOf(savedDef) || base.severity || 'warn',
+    message: savedObj.message ?? base.message ?? '',
+    description: savedObj.description ?? descriptionFor(code) ?? '',
+  };
 }
 function openRuleModal(code: string, format: string = current.format) {
   modalRuleName = code;
   modalRuleFormat = format;
-  const builtin = !ruleDef(code) && !getRule(code, format);
+  const inline = isInlineRule(code, format);
+  const f = effectiveRuleFields(code, format);
   $('#modal-title').textContent = titleCase(code);
-  $('#rule-note').textContent = builtin
-    ? 'Built-in rule from the extended ruleset — edit the severity (error/warn/info/hint/off) or replace with a full rule definition.'
-    : 'Edit this rule. Saving overrides the original when linting.';
+  $('#rule-note').textContent = inline
+    ? 'Edit this rule’s severity, message, and description. Saving overrides the original when linting.'
+    : 'Built-in rule — only its severity can be changed. Message and description come from the built-in ruleset.';
+  $<HTMLSelectElement>('#rule-severity').value = f.severity;
+  const msg = $<HTMLInputElement>('#rule-message');
+  const desc = $<HTMLTextAreaElement>('#rule-description');
+  msg.value = f.message;
+  desc.value = f.description;
+  // Message/description are only editable for inline rules.
+  msg.disabled = desc.disabled = !inline;
+  $('#rf-message-note').textContent = inline ? '' : '(built-in — read only)';
+  $('#rf-desc-note').textContent = inline ? '' : '(built-in — read only)';
   ($('#modal') as HTMLElement).hidden = false;
-  const ed = ensureRuleEditor();
-  ed.setValue(stringifyYaml({ [code]: ruleDefForEditing(code) }));
-  requestAnimationFrame(() => { ed.layout(); ed.focus(); });
+  requestAnimationFrame(() => $<HTMLSelectElement>('#rule-severity').focus());
 }
 function closeModal() {
   ($('#modal') as HTMLElement).hidden = true;
@@ -564,17 +581,23 @@ function closeModal() {
 $('#modal-close').addEventListener('click', closeModal);
 $('#modal').addEventListener('click', (e) => { if (e.target === $('#modal')) closeModal(); });
 $('#rule-apply').addEventListener('click', () => {
-  if (!ruleEditor) return;
-  try {
-    const parsed = parseYaml(ruleEditor.getValue());
-    const entry = parsed && typeof parsed === 'object' ? Object.entries(parsed)[0] : undefined;
-    if (entry) upsertRule(entry[0], modalRuleFormat, entry[1]);
-    closeModal();
-    renderSavedRules();
-    runLint();
-  } catch {
-    $('#rule-note').textContent = 'Invalid YAML — fix and try again.';
+  const severity = $<HTMLSelectElement>('#rule-severity').value;
+  if (isInlineRule(modalRuleName, modalRuleFormat)) {
+    // Inline rule: a partial override object; activeRulesetDef merges it onto the
+    // full base definition so `given`/`then` are preserved.
+    const def: any = { severity };
+    const message = $<HTMLInputElement>('#rule-message').value.trim();
+    const description = $<HTMLTextAreaElement>('#rule-description').value.trim();
+    if (message) def.message = message;
+    if (description) def.description = description;
+    upsertRule(modalRuleName, modalRuleFormat, def);
+  } else {
+    // Built-in rule: Spectral only accepts a severity string for an inherited rule.
+    upsertRule(modalRuleName, modalRuleFormat, severity);
   }
+  closeModal();
+  renderSavedRules();
+  runLint();
 });
 $('#rule-reset').addEventListener('click', () => {
   removeRule(modalRuleName, modalRuleFormat);
@@ -673,7 +696,7 @@ function renderSavedRules() {
     ? rules
         .map((r) => {
           const disabled = r.def === 'off' || r.def === false;
-          const state = disabled ? 'disabled' : typeof r.def === 'object' && r.def?.severity ? r.def.severity : 'custom';
+          const state = disabled ? 'disabled' : sevOf(r.def) ?? 'custom';
           return `<li class="${disabled ? 'rule-off' : ''}" data-name="${escapeHtml(r.name)}" data-format="${escapeHtml(r.format)}" data-disabled="${disabled ? '1' : ''}">
             <span class="store-name" title="${escapeHtml(r.name)}">${escapeHtml(titleCase(r.name))}</span>
             <span class="store-meta">${escapeHtml(labelForFormat(r.format))} · ${escapeHtml(String(state))} · ${timeAgo(r.updatedAt)}</span>
