@@ -981,10 +981,23 @@ $('#download-apisjson').addEventListener('click', () => {
 });
 
 // ---- Docs tab: generate documentation for the current document --------------
-// The doc renderer's stylesheet is light-themed; render it on a white surface.
+// Load the doc stylesheet, then remap its colour variables to the dark app
+// palette so the preview blends in. (Downloads keep the light defaults.)
 (function injectDocsStyle() {
   const el = document.createElement('style');
-  el.textContent = `${DOCS_CSS}\n#docs-view { background: #fff; padding: 1rem 1.25rem; border-radius: 6px; overflow: auto; }`;
+  el.textContent = `${DOCS_CSS}
+#docs-view { padding: 0.25rem 0.25rem 1rem; overflow: auto; }
+#docs-view.doc-view {
+  --dc-fg: var(--fg);
+  --dc-muted: var(--muted);
+  --dc-faint: var(--muted);
+  --dc-line: var(--line);
+  --dc-soft: var(--panel);
+  --dc-th: #2b2b2c;
+  --dc-code: rgba(255,255,255,0.09);
+  --dc-accent: var(--info);
+  --dc-border: var(--line);
+}`;
   document.head.appendChild(el);
 })();
 function currentDocName(): string {

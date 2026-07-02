@@ -323,48 +323,55 @@ export function renderDocsMarkdown(format: string, text: string): { markdown: st
 
 // The stylesheet used both in the app (scoped by .doc-view) and the standalone
 // download. Kept here so the download is fully self-contained.
+// Colours are driven by CSS variables with LIGHT defaults (so the standalone
+// download / print stays printable). The in-app preview remaps these variables to
+// the dark app palette — see injectDocsStyle in main.ts.
 export const DOCS_CSS = `
-.doc-view { color: #1e1e1e; line-height: 1.55; }
-.doc-view a { color: #0d6efd; }
-.doc-header { border-bottom: 2px solid #eee; padding-bottom: 0.75rem; margin-bottom: 1rem; }
-.doc-kind { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: #888; font-weight: 700; }
+.doc-view {
+  --dc-fg: #1e1e1e; --dc-muted: #666; --dc-faint: #888; --dc-line: #e3e7ee;
+  --dc-soft: #fafbfc; --dc-th: #f1f3f6; --dc-code: #eef1f5; --dc-accent: #0d6efd; --dc-border: #eee;
+  color: var(--dc-fg); line-height: 1.55;
+}
+.doc-view a { color: var(--dc-accent); }
+.doc-header { border-bottom: 2px solid var(--dc-border); padding-bottom: 0.75rem; margin-bottom: 1rem; }
+.doc-kind { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--dc-faint); font-weight: 700; }
 .doc-header h1 { margin: 0.2rem 0; font-size: 1.7rem; }
-.doc-version { font-size: 0.9rem; color: #666; font-weight: 500; }
-.doc-desc { color: #333; }
+.doc-version { font-size: 0.9rem; color: var(--dc-muted); font-weight: 500; }
+.doc-desc { color: var(--dc-fg); }
 .doc-desc p { margin: 0.4rem 0; }
 .doc-desc ul, .doc-desc ol { margin: 0.4rem 0; padding-left: 1.3rem; }
 .doc-section { margin: 1.5rem 0; }
-.doc-section > h2 { font-size: 1.25rem; border-bottom: 1px solid #eee; padding-bottom: 0.3rem; }
+.doc-section > h2 { font-size: 1.25rem; border-bottom: 1px solid var(--dc-border); padding-bottom: 0.3rem; }
 .doc-list { margin: 0.4rem 0; padding-left: 1.2rem; }
-.doc-tag { font-size: 1.05rem; color: #0d6efd; margin: 1rem 0 0.4rem; }
-.doc-op { border: 1px solid #e3e7ee; border-radius: 8px; padding: 0.75rem 0.9rem; margin: 0.6rem 0; background: #fafbfc; }
+.doc-tag { font-size: 1.05rem; color: var(--dc-accent); margin: 1rem 0 0.4rem; }
+.doc-op { border: 1px solid var(--dc-line); border-radius: 8px; padding: 0.75rem 0.9rem; margin: 0.6rem 0; background: var(--dc-soft); }
 .doc-op-head { display: flex; align-items: center; gap: 0.6rem; }
 .doc-method { color: #fff; font-weight: 700; font-size: 0.72rem; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; }
 .doc-m-get { background: #0d6efd; } .doc-m-post { background: #198754; } .doc-m-put { background: #fd7e14; }
 .doc-m-patch { background: #6f42c1; } .doc-m-delete { background: #dc3545; } .doc-m-head, .doc-m-options, .doc-m-trace { background: #6c757d; }
 .doc-path { font-size: 0.95rem; }
 .doc-summary { font-weight: 600; margin: 0.4rem 0 0.2rem; }
-.doc-opid { font-size: 0.8rem; color: #777; }
-.doc-op h4 { margin: 0.7rem 0 0.3rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #666; }
+.doc-opid { font-size: 0.8rem; color: var(--dc-muted); }
+.doc-op h4 { margin: 0.7rem 0 0.3rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--dc-muted); }
 .doc-table { width: 100%; border-collapse: collapse; margin: 0.3rem 0; font-size: 0.9rem; }
-.doc-table th, .doc-table td { border: 1px solid #e3e7ee; padding: 5px 8px; text-align: left; vertical-align: top; }
-.doc-table th { background: #f1f3f6; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; color: #555; }
+.doc-table th, .doc-table td { border: 1px solid var(--dc-line); padding: 5px 8px; text-align: left; vertical-align: top; }
+.doc-table th { background: var(--dc-th); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--dc-muted); }
 .doc-req { color: #dc3545; font-weight: 700; }
-.doc-constraints { font-size: 0.8rem; color: #888; margin-top: 2px; }
-.doc-nested { margin-top: 0.4rem; padding-left: 0.6rem; border-left: 2px solid #e3e7ee; }
+.doc-constraints { font-size: 0.8rem; color: var(--dc-faint); margin-top: 2px; }
+.doc-nested { margin-top: 0.4rem; padding-left: 0.6rem; border-left: 2px solid var(--dc-line); }
 .doc-ref-expand { margin: 0.2rem 0; }
-.doc-ref-name { font-size: 0.82rem; color: #0d6efd; margin-bottom: 2px; }
-.doc-comb { margin: 0.3rem 0; padding-left: 0.6rem; border-left: 2px dashed #cbd3df; }
-.doc-comb-label { font-size: 0.75rem; text-transform: uppercase; color: #888; font-weight: 700; }
+.doc-ref-name { font-size: 0.82rem; color: var(--dc-accent); margin-bottom: 2px; }
+.doc-comb { margin: 0.3rem 0; padding-left: 0.6rem; border-left: 2px dashed var(--dc-line); }
+.doc-comb-label { font-size: 0.75rem; text-transform: uppercase; color: var(--dc-faint); font-weight: 700; }
 .doc-resp { margin: 0.3rem 0; }
-.doc-status { display: inline-block; font-weight: 700; font-family: ui-monospace, Menlo, monospace; background: #eef1f5; padding: 1px 6px; border-radius: 3px; margin-right: 0.4rem; }
+.doc-status { display: inline-block; font-weight: 700; font-family: ui-monospace, Menlo, monospace; background: var(--dc-code); padding: 1px 6px; border-radius: 3px; margin-right: 0.4rem; }
 .doc-schema, .doc-channel, .doc-workflow { margin: 1rem 0; }
 .doc-schema h3, .doc-channel h3, .doc-workflow h3 { font-size: 1rem; }
 .doc-steps { padding-left: 1.2rem; }
 .doc-steps li { margin: 0.5rem 0; }
-.doc-step-params, .doc-step-crit { font-size: 0.82rem; color: #666; margin-top: 2px; }
-.doc-ref { color: #666; }
-.doc-view code { background: #eef1f5; padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
+.doc-step-params, .doc-step-crit { font-size: 0.82rem; color: var(--dc-muted); margin-top: 2px; }
+.doc-ref { color: var(--dc-muted); }
+.doc-view code { background: var(--dc-code); padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
 `;
 
 export function standaloneDocs(title: string, inner: string): string {
