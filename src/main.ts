@@ -751,6 +751,7 @@ function switchTab(name: string) {
   ($('#tab-rules') as HTMLElement).hidden = name !== 'rules';
   ($('#tab-repos') as HTMLElement).hidden = name !== 'repos';
   ($('#tab-config') as HTMLElement).hidden = name !== 'config';
+  ($('#tab-about') as HTMLElement).hidden = name !== 'about';
   if (name === 'repos') { renderRepos(); loadAccessibleRepos(); }
   // the tag filter applies to Results + Rules; build it lazily on first use
   const filterable = name === 'results' || name === 'ruleset';

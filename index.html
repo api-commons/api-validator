@@ -59,6 +59,7 @@
           <button class="tab" data-tab="rules" type="button">Saved Rules <span class="badge" id="rules-count">0</span></button>
           <button class="tab" data-tab="repos" type="button">Repos <span class="badge" id="repos-count">0</span></button>
           <button class="tab" data-tab="config" type="button">Config</button>
+          <button class="tab" data-tab="about" type="button">About</button>
         </div>
 
         <div class="tag-filter" id="tag-filter" hidden>
@@ -181,6 +182,40 @@
               </div>
             </details>
             <label class="config-show"><input type="checkbox" id="cfg-show"> Show values</label>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-about" hidden>
+          <div class="about">
+            <h2>API Validator</h2>
+            <p class="about-lede">A browser-first API governance tool. Lint <strong>OpenAPI, AsyncAPI, Arazzo, and JSON Schema</strong> against a best-of-breed ruleset powered by <a href="https://github.com/stoplightio/spectral" target="_blank" rel="noopener">Spectral</a> — entirely in your browser. No backend and no accounts; your tokens and documents never leave this page.</p>
+
+            <h3>What you can do</h3>
+            <ul class="about-list">
+              <li><strong>Search &amp; load</strong> real artifacts from <strong>GitHub / GitLab / Bitbucket</strong> with your own token, or <strong>upload</strong> a file from disk.</li>
+              <li><strong>Edit</strong> in a Monaco editor with a YAML&nbsp;⇄&nbsp;JSON toggle.</li>
+              <li><strong>Lint</strong> against curated rules; every finding links to its rule, which you can retune (severity, message, description) or disable — overrides persist in your browser.</li>
+              <li><strong>Document</strong> — generate readable docs for the current artifact and download them as HTML or Markdown.</li>
+              <li><strong>Transform</strong> — bundle <code>$ref</code>s, componentize, split by tag/channel/workflow, migrate JSON Schema drafts, and more.</li>
+              <li><strong>Save &amp; ship</strong> — autosave locally, roll everything into an <strong>APIs.json&nbsp;0.21</strong> index, or commit / open a PR to a repo.</li>
+              <li><strong>Run offline</strong> — download the whole app as a single self-contained file (the “Run Locally” button).</li>
+            </ul>
+
+            <h3>Engine &amp; scope</h3>
+            <p>Powered by the published <code>@stoplight/spectral-*</code> engine, running fully client-side. OpenAPI and AsyncAPI extend Spectral’s built-in <code>spectral:oas</code> / <code>spectral:asyncapi</code> rulesets; Arazzo and JSON Schema are linted by curated inline rules. Scope is deliberately narrow — four artifact types, kept simple.</p>
+
+            <h3>Rules &amp; credits</h3>
+            <p>The best-of-breed ruleset is compiled from the first-party <a href="https://github.com/api-evangelist/rules" target="_blank" rel="noopener">API Evangelist</a> OpenAPI governance ruleset plus public, redistribution-compatible Spectral rulesets — <strong>SPS Commerce, Adidas, Trimble, Paystack, DigitalOcean, Microcks, Baloise, Team Digitale, and Schwarz IT</strong> (all Apache-2.0 or MIT). Full attribution and vendored licenses are in <a href="https://github.com/api-commons/api-validator/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">THIRD_PARTY_NOTICES</a>.</p>
+
+            <h3>Part of API Commons</h3>
+            <p>One of the <a href="https://apicommons.org/tools/" target="_blank" rel="noopener">API Commons tools</a>, alongside API Discovery, API Documentation, API Reusability, and MCP Install — all browser-first and free to fork.</p>
+
+            <div class="about-links">
+              <a class="btn-yellow" href="https://github.com/api-commons/api-validator" target="_blank" rel="noopener">GitHub ↗</a>
+              <a class="btn-yellow" href="https://apicommons.org/tools/" target="_blank" rel="noopener">API Commons ↗</a>
+              <a class="btn-yellow" href="https://apievangelist.com/services/" target="_blank" rel="noopener">Governance services ↗</a>
+            </div>
+            <p class="about-foot">A project of <a href="https://apievangelist.com" target="_blank" rel="noopener">API Evangelist</a>, maintained openly under <a href="https://apicommons.org" target="_blank" rel="noopener">API Commons</a>. Open source and free to fork; API Evangelist offers expert governance services when you want help.</p>
           </div>
         </div>
       </section>

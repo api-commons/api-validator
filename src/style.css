@@ -125,6 +125,20 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
 .rule-field select { max-width: 160px; }
 .rule-field textarea { resize: vertical; min-height: 3.5em; }
 .rule-field input:focus, .rule-field textarea:focus, .rule-field select:focus { outline: none; border-color: var(--accent); }
+
+/* About tab */
+.about { max-width: 760px; padding: 0.5rem 0.25rem 2rem; line-height: 1.6; }
+.about h2 { font-size: 1.5rem; margin: 0.2rem 0 0.4rem; }
+.about h3 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); margin: 1.4rem 0 0.4rem; }
+.about .about-lede { font-size: 1.05rem; color: var(--fg); }
+.about p { color: #c8c8c8; }
+.about a { color: var(--info); }
+.about-list { margin: 0.4rem 0; padding-left: 1.2rem; }
+.about-list li { margin: 0.35rem 0; color: #c8c8c8; }
+.about-list strong, .about p strong { color: var(--fg); }
+.about code { background: rgba(255,255,255,0.09); padding: 1px 5px; border-radius: 3px; font-size: 0.88em; }
+.about-links { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.4rem 0 1rem; }
+.about-foot { font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 0.9rem; margin-top: 1.2rem; }
 .rule-field input:disabled, .rule-field textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 .modal-actions { display: flex; gap: 0.5rem; padding: 0 0.9rem 0.9rem; }
 .modal-actions button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 0.85rem; }
