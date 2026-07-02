@@ -1037,7 +1037,7 @@ $('#docs-print').addEventListener('click', () => {
   window.setTimeout(() => w.print(), 350);
 });
 
-// API Evangelist services — a context-aware "Get a review" front door. Reads the
+// API Evangelist services — a context-aware "Get Help" front door. Reads the
 // current artifact + finding count at click time so the email starts with detail.
 initEngage(() => {
   const parts = [`Artifact type: ${labelForFormat(current.format)}`];
