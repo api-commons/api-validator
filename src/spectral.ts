@@ -39,6 +39,16 @@ export const builtinRulesByFormat: Record<string, string[]> = {
   asyncapi: Object.keys((asyncapi as any)?.rules ?? {}),
 };
 
+// The subset the engine actually runs when we extend the bare ruleset — Spectral
+// enables rules whose `recommended` is not false. These are the built-in rules we
+// re-level to `warn` (without enabling the dormant, non-recommended ones).
+const recommendedNames = (rs: any): string[] =>
+  Object.entries<any>(rs?.rules ?? {}).filter(([, r]) => r?.recommended !== false).map(([n]) => n);
+export const builtinRecommendedByFormat: Record<string, string[]> = {
+  openapi: recommendedNames(oas),
+  asyncapi: recommendedNames(asyncapi),
+};
+
 // Normalize ruleset format strings to the format-function export names.
 const FORMAT_ALIASES: Record<string, string> = {
   'oas3.0': 'oas3_0', 'oas3.1': 'oas3_1', oas31: 'oas3_1', oas30: 'oas3_0',

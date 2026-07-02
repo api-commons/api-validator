@@ -2,7 +2,7 @@ import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { lint, builtinDescriptions, builtinRulesByFormat } from './spectral';
+import { lint, builtinDescriptions, builtinRulesByFormat, builtinRecommendedByFormat } from './spectral';
 import { ARTIFACTS, SAMPLES, artifactById, type ArtifactType } from './artifacts';
 import allRulesRaw from './all-rules.json';
 import { searchSource, loadHit, enabledSources, type Hit, type SourceId, type Tokens } from './sources';
@@ -254,9 +254,14 @@ function activeRulesetDef(): any {
     if (t.includes('duplicate:true')) continue;
     rules[name] = engineRule(rule);
   }
-  // we don't support Swagger / OpenAPI 2.0 — turn off any built-in oas2 rules
+  // Built-in (extended) rules: we don't support Swagger / OpenAPI 2.0, so turn off
+  // any oas2 rules; every other active (recommended) built-in is re-leveled to
+  // `warn` so the whole ruleset reports at a single severity. Non-recommended
+  // built-ins are left dormant (not enabled just to re-level them).
+  const recommended = new Set(builtinRecommendedByFormat[current.format] ?? []);
   for (const name of builtinRulesByFormat[current.format] ?? []) {
     if (/^oas2[-_]/i.test(name)) rules[name] = 'off';
+    else if (recommended.has(name)) rules[name] = 'warn';
   }
   // saved rule overrides for this format take priority over the originals
   const isInline = (name: string) => !!ALL_RULES[current.format]?.[name] && ALL_RULES[current.format][name].source !== 'builtin';
