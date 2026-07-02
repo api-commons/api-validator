@@ -13,6 +13,7 @@ import builtinMetaRaw from './builtin-meta.json';
 import { listAccessibleRepos, loadRepos, addRepo, removeRepo, type Repo } from './repos';
 import { commitGitHub, openPrGitHub } from './git';
 import { utilitiesFor } from './utilities';
+import { renderDocs as renderDocsHtml, standaloneDocs, DOCS_CSS } from './docs';
 import { buildApisJson } from './apisjson';
 import { initEngage } from './engage';
 import './style.css';
@@ -744,6 +745,7 @@ function switchTab(name: string) {
   document.querySelectorAll<HTMLButtonElement>('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   ($('#tab-results') as HTMLElement).hidden = name !== 'results';
   ($('#tab-ruleset') as HTMLElement).hidden = name !== 'ruleset';
+  ($('#tab-docs') as HTMLElement).hidden = name !== 'docs';
   ($('#tab-utilities') as HTMLElement).hidden = name !== 'utilities';
   ($('#tab-saved') as HTMLElement).hidden = name !== 'saved';
   ($('#tab-rules') as HTMLElement).hidden = name !== 'rules';
@@ -756,6 +758,7 @@ function switchTab(name: string) {
   if (filterable && !facetsBuilt) buildFilterUI();
   if (name === 'ruleset') renderRuleset();
   if (name === 'utilities') renderUtilities();
+  if (name === 'docs') renderDocs();
 }
 
 // ---- Rules tab: every rule grouped by artifact, with enable/disable ----------
@@ -977,6 +980,44 @@ $('#download-apisjson').addEventListener('click', () => {
   downloadFile('apis.yaml', yaml);
 });
 
+// ---- Docs tab: generate documentation for the current document --------------
+// The doc renderer's stylesheet is light-themed; render it on a white surface.
+(function injectDocsStyle() {
+  const el = document.createElement('style');
+  el.textContent = `${DOCS_CSS}\n#docs-view { background: #fff; padding: 1rem 1.25rem; border-radius: 6px; overflow: auto; }`;
+  document.head.appendChild(el);
+})();
+function currentDocName(): string {
+  const d = activeId ? getDoc(activeId) : undefined;
+  return (d?.name || `Untitled ${current.label}`).replace(/\.(ya?ml|json)$/i, '');
+}
+function renderDocs() {
+  const { html, error } = renderDocsHtml(current.format, docEditor.getValue());
+  $('#docs-view').innerHTML = error
+    ? `<div class="err">${escapeHtml(error)}</div>`
+    : (html || '<div class="ok">Nothing to document yet.</div>');
+}
+let docsTimer: number | undefined;
+function scheduleDocs() {
+  clearTimeout(docsTimer);
+  docsTimer = window.setTimeout(() => { if (activeTab === 'docs') renderDocs(); }, 300);
+}
+$('#docs-download-html').addEventListener('click', () => {
+  const { html, error } = renderDocsHtml(current.format, docEditor.getValue());
+  if (error) { window.alert(error); return; }
+  downloadFile(`${currentDocName()}-docs.html`, standaloneDocs(currentDocName(), html), 'text/html');
+});
+$('#docs-print').addEventListener('click', () => {
+  const { html, error } = renderDocsHtml(current.format, docEditor.getValue());
+  if (error) { window.alert(error); return; }
+  const w = window.open('', '_blank');
+  if (!w) { window.alert('Allow pop-ups to open the printable view.'); return; }
+  w.document.write(standaloneDocs(currentDocName(), html));
+  w.document.close();
+  w.focus();
+  window.setTimeout(() => w.print(), 350);
+});
+
 // API Evangelist services — a context-aware "Get a review" front door. Reads the
 // current artifact + finding count at click time so the email starts with detail.
 initEngage(() => {
@@ -1159,6 +1200,7 @@ for (const sel of ['#results', '#ruleset-list']) {
 // ---- boot -------------------------------------------------------------------
 docEditor.onDidChangeModelContent(() => {
   scheduleLint();
+  scheduleDocs();
   if (!suppressSave) scheduleSave();
 });
 renderSavedRules();

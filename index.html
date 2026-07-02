@@ -53,6 +53,7 @@
         <div class="tabs" role="tablist">
           <button class="tab active" data-tab="results" type="button">Results</button>
           <button class="tab" data-tab="ruleset" type="button">Rules</button>
+          <button class="tab" data-tab="docs" type="button">Docs</button>
           <button class="tab" data-tab="utilities" type="button">Utilities</button>
           <button class="tab" data-tab="saved" type="button">Saved Artifacts <span class="badge" id="saved-count">0</span></button>
           <button class="tab" data-tab="rules" type="button">Saved Rules <span class="badge" id="rules-count">0</span></button>
@@ -88,6 +89,14 @@
           <div id="ruleset-list"></div>
         </div>
 
+        <div class="tab-panel" id="tab-docs" hidden>
+          <div class="repos-add docs-bar">
+            <span class="muted small">Live documentation for the <strong>current document</strong></span>
+            <button id="docs-download-html" class="save-btn" type="button" title="Download as a standalone HTML page">Download HTML</button>
+            <button id="docs-print" class="upload-btn" type="button" title="Open a printable view (Save as PDF)">Print</button>
+          </div>
+          <div id="docs-view" class="doc-view"></div>
+        </div>
         <div class="tab-panel" id="tab-utilities" hidden>
           <p class="saved-notice">
             Apply a transformation to the <strong>current document</strong>, grouped by artifact type.
