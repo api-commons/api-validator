@@ -8,7 +8,7 @@
   "scripts": {
     "compile-rules": "node tools/compile-rules.mjs",
     "dev": "vite",
-    "build": "vite build && node tools/zip-dist.mjs",
+    "build": "vite build && SINGLEFILE=1 vite build && node tools/zip-dist.mjs",
     "preview": "vite preview",
     "check:rulesets": "tsx tools/check-rulesets.ts",
     "check": "npm run check:rulesets"
@@ -23,9 +23,10 @@
     "yaml": "^2.6.1"
   },
   "devDependencies": {
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.2",
     "vite": "^5.4.11",
     "vite-plugin-node-polyfills": "^0.22.0",
-    "typescript": "^5.7.2",
-    "tsx": "^4.22.4"
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }

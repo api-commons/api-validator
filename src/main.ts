@@ -1,6 +1,8 @@
 import * as monaco from 'monaco-editor';
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+// Inline the workers (base64 blob) so the single-file "Run Locally" build has no
+// external worker files — it must run from a double-clicked file:// index.html.
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline';
+import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker&inline';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { lint, builtinDescriptions, builtinRulesByFormat, builtinRecommendedByFormat } from './spectral';
 import { ARTIFACTS, SAMPLES, artifactById, type ArtifactType } from './artifacts';
@@ -20,7 +22,14 @@ const BUILTIN_META = builtinMetaRaw as Record<string, { format: string; spec: st
 
 self.MonacoEnvironment = {
   getWorker(_id, label) {
-    return label === 'json' ? new JsonWorker() : new EditorWorker();
+    try {
+      return label === 'json' ? new JsonWorker() : new EditorWorker();
+    } catch {
+      // A locked-down context (e.g. a double-clicked file:// page) may refuse to
+      // spawn workers. Fall back to a no-op worker so the editor still boots —
+      // background language services degrade, but editing + Spectral linting work.
+      return new Worker(URL.createObjectURL(new Blob([''], { type: 'text/javascript' })));
+    }
   },
 };
 
