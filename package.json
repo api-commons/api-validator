@@ -1,0 +1,31 @@
+{
+  "name": "api-validator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based OpenAPI / AsyncAPI / Arazzo / JSON Schema governance tool powered by Spectral.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "compile-rules": "node tools/compile-rules.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check:rulesets": "tsx tools/check-rulesets.ts",
+    "check": "npm run check:rulesets"
+  },
+  "dependencies": {
+    "@stoplight/spectral-core": "^1.19.0",
+    "@stoplight/spectral-formats": "^1.7.0",
+    "@stoplight/spectral-functions": "^1.9.0",
+    "@stoplight/spectral-parsers": "^1.0.4",
+    "@stoplight/spectral-rulesets": "^1.21.0",
+    "monaco-editor": "^0.52.2",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11",
+    "vite-plugin-node-polyfills": "^0.22.0",
+    "typescript": "^5.7.2",
+    "tsx": "^4.22.4"
+  }
+}

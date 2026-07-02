@@ -1,0 +1,4 @@
+# Arazzo — starter ruleset. Spectral has no built-in Arazzo ruleset, so Arazzo is
+# linted entirely by the curated inline rules in src/all-rules.json. Add your own
+# organization rules here.
+rules: {}

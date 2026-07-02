@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API Validator — Spectral-powered API governance</title>
+    <meta name="description" content="Lint OpenAPI, AsyncAPI, Arazzo, and JSON Schema in the browser with Spectral rules. Search GitHub/GitLab/Bitbucket for real artifacts, edit the ruleset, and commit or PR back to Git. No backend — tokens stay in your browser." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <strong>API Validator</strong>
+        <span class="tag">validator.apicommons.org</span>
+      </div>
+      <nav>
+        <a href="https://github.com/api-commons/api-validator/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener" title="Rule sources &amp; licenses">Credits</a>
+        <a href="https://apis.io" target="_blank" rel="noopener">APIs.io</a>
+        <a href="https://apicommons.org/tools/" target="_blank" rel="noopener">API Commons</a>
+        <a href="https://github.com/api-commons/api-validator" target="_blank" rel="noopener">GitHub</a>
+        <button id="engage-ae" class="engage-btn" type="button" title="Work with API Evangelist on a governance review or service">Get a review</button>
+        <button id="download-apisjson" class="reset-btn" type="button" title="Assemble all saved artifacts into an APIs.json (YAML) and download">Download as APIs.json</button>
+        <button id="reset-storage" class="reset-btn" type="button" title="Clear all saved artifacts and rules stored in this browser">Reset</button>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="pane">
+        <div class="artifact-toolbar">
+          <select id="artifact-type" class="art-select" aria-label="Artifact type"></select>
+          <select id="source-select" class="art-select" aria-label="Search source" title="Where to search (toggle sources in Config)"></select>
+          <div class="search-wrap">
+            <input id="artifact-search" type="search" placeholder="Search…" autocomplete="off" />
+            <button id="artifact-search-btn" title="Search">Search</button>
+            <div id="search-results" class="search-results" hidden></div>
+          </div>
+          <div class="lang-toggle" role="group" aria-label="Editor format">
+            <button id="lang-yaml" class="active" type="button">YAML</button>
+            <button id="lang-json" type="button">JSON</button>
+          </div>
+          <button id="doc-save" class="save-btn" type="button" title="Save to this browser's local storage">Save</button>
+        </div>
+        <div id="doc-status" class="muted small doc-status"></div>
+        <div id="doc-editor" class="editor"></div>
+      </section>
+
+      <section class="pane">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="results" type="button">Results</button>
+          <button class="tab" data-tab="ruleset" type="button">Rules</button>
+          <button class="tab" data-tab="utilities" type="button">Utilities</button>
+          <button class="tab" data-tab="saved" type="button">Saved Artifacts <span class="badge" id="saved-count">0</span></button>
+          <button class="tab" data-tab="rules" type="button">Saved Rules <span class="badge" id="rules-count">0</span></button>
+          <button class="tab" data-tab="repos" type="button">Repos <span class="badge" id="repos-count">0</span></button>
+          <button class="tab" data-tab="config" type="button">Config</button>
+        </div>
+
+        <div class="tag-filter" id="tag-filter" hidden>
+          <details id="filter-details">
+            <summary>
+              <span class="filter-summary-label">Filter by tag</span>
+              <span class="filter-active" id="filter-active"></span>
+            </summary>
+            <div class="filter-facets" id="filter-facets"></div>
+          </details>
+          <button class="filter-clear" id="filter-clear" type="button" hidden>clear</button>
+        </div>
+
+        <div class="tab-panel" id="tab-results">
+          <div class="rules-meta muted small">
+            <span id="active-count">0</span> rules active ·
+            <span id="result-count">—</span> ·
+            <span class="hint-text">click a result to edit its rule</span>
+          </div>
+          <div id="results"></div>
+        </div>
+
+        <div class="tab-panel" id="tab-ruleset" hidden>
+          <p class="saved-notice">
+            Enable or disable any rule — disabled rules are skipped whenever you lint that artifact
+            type (stored in this browser). Grouped by artifact.
+          </p>
+          <div id="ruleset-list"></div>
+        </div>
+
+        <div class="tab-panel" id="tab-utilities" hidden>
+          <p class="saved-notice">
+            Apply a transformation to the <strong>current document</strong>, grouped by artifact type.
+            Some create new entries in Saved Artifacts; the primary document is always kept. More functions coming.
+          </p>
+          <div id="utilities-status" class="muted small"></div>
+          <div id="utilities-list"></div>
+        </div>
+        <div class="tab-panel" id="tab-saved" hidden>
+          <p class="saved-notice">
+            Your documents autosave to this browser's local storage as you edit — no account needed.
+            They'll <strong>disappear if you clear your browser cache</strong>. Commit or open a PR to save one
+            to a repo from the Repos tab (needs a GitHub token).
+          </p>
+          <div class="repos-add saved-git-bar">
+            <span class="muted small">Commit / PR to</span>
+            <select id="saved-repo-select" title="Target repo — manage the list in the Repos tab"></select>
+            <span id="saved-git-status" class="muted small"></span>
+          </div>
+          <ul id="saved-list" class="store-list"></ul>
+        </div>
+
+        <div class="tab-panel" id="tab-rules" hidden>
+          <p class="saved-notice">
+            Rules you save here <strong>override the built-in rule of the same name</strong> when linting, and
+            persist in this browser. Remove one to revert to the original. Edit a rule from any result to save it.
+          </p>
+          <ul id="saved-rules-list" class="store-list"></ul>
+        </div>
+
+        <div class="tab-panel" id="tab-repos" hidden>
+          <p class="saved-notice">
+            Add the GitHub repos you work with — stored in this browser and offered wherever you commit or
+            open a PR (saving artifacts &amp; rulesets to Git is coming soon). Needs a GitHub token (Config).
+          </p>
+          <div class="repos-add">
+            <select id="repo-picker" aria-label="Accessible repositories"></select>
+            <button id="repo-refresh" type="button" title="Reload your repos from GitHub">↻</button>
+            <button id="repo-add" class="save-btn" type="button">Add</button>
+          </div>
+          <ul id="repos-list" class="store-list"></ul>
+        </div>
+        <div class="tab-panel" id="tab-config" hidden>
+          <p class="saved-notice">
+            Stored <strong>only in this browser's local storage</strong> (cleared by Reset or clearing your cache).
+            These power code search across Git hosts and saving artifacts &amp; rules to Git.
+            Nothing is sent anywhere until you use those features.
+          </p>
+          <div class="config-scroll">
+            <details class="rule-group config-group" open>
+              <summary><span class="group-name">Search sources</span></summary>
+              <div class="config-fields">
+                <p class="config-note">Where Search looks for artifacts. GitHub is on by default; GitLab &amp; Bitbucket need their tokens below.</p>
+                <label class="src-toggle"><input type="checkbox" id="src-github" checked> GitHub</label>
+                <label class="src-toggle"><input type="checkbox" id="src-gitlab"> GitLab</label>
+                <label class="src-toggle"><input type="checkbox" id="src-bitbucket"> Bitbucket</label>
+              </div>
+            </details>
+            <details class="rule-group config-group" open>
+              <summary><span class="group-name">Git tokens</span></summary>
+              <div class="config-fields">
+                <div class="config-field">
+                  <div class="config-label"><label for="cfg-github">GitHub personal access token</label>
+                    <a class="config-help" href="https://github.com/settings/tokens" target="_blank" rel="noopener">create a token ↗</a></div>
+                  <input type="password" id="cfg-github" autocomplete="off" spellcheck="false" placeholder="ghp_…">
+                </div>
+                <div class="config-field">
+                  <div class="config-label"><label for="cfg-gitlab">GitLab personal access token</label>
+                    <a class="config-help" href="https://gitlab.com/-/user_settings/personal_access_tokens" target="_blank" rel="noopener">create a token ↗</a></div>
+                  <input type="password" id="cfg-gitlab" autocomplete="off" spellcheck="false" placeholder="glpat-…">
+                </div>
+                <div class="config-field">
+                  <div class="config-label"><label for="cfg-bitbucketUser">Bitbucket username</label></div>
+                  <input type="text" id="cfg-bitbucketUser" autocomplete="off" spellcheck="false" placeholder="workspace / username">
+                </div>
+                <div class="config-field">
+                  <div class="config-label"><label for="cfg-bitbucket">Bitbucket app password</label>
+                    <a class="config-help" href="https://bitbucket.org/account/settings/app-passwords/" target="_blank" rel="noopener">create one ↗</a></div>
+                  <input type="password" id="cfg-bitbucket" autocomplete="off" spellcheck="false" placeholder="app password">
+                </div>
+              </div>
+            </details>
+            <label class="config-show"><input type="checkbox" id="cfg-show"> Show values</label>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card">
+        <div class="modal-head">
+          <span id="modal-title">Edit rule</span>
+          <button id="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <p id="rule-note" class="muted small"></p>
+        <div id="rule-editor" class="editor"></div>
+        <div class="modal-actions">
+          <button id="rule-apply" class="primary">Apply &amp; lint</button>
+          <button id="rule-reset">Reset to default</button>
+          <button id="rule-disable">Disable rule</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
