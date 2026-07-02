@@ -179,6 +179,15 @@ code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
 .reset-btn { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 4px 12px; font-size: 0.85rem; cursor: pointer; }
 .reset-btn:hover { color: #f14c4c; border-color: #f14c4c; }
 
+/* GitHub "Fork" button in the header */
+.gh-btn { display: inline-flex; align-items: center; gap: 6px; background: #24292f; color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; text-decoration: none; }
+.gh-btn:hover { background: #30363d; }
+.gh-btn svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* neutral download button (Run Locally) — accent hover, not destructive red */
+.dl-btn { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 4px 12px; font-size: 0.85rem; cursor: pointer; text-decoration: none; }
+.dl-btn:hover { color: var(--accent); border-color: var(--accent); }
+
 /* ---- collapsible result groups (by rule category) ---- */
 #results .ok, #results .err { display: block; padding: 0.75rem; color: var(--muted); }
 #results .err { color: var(--error); }

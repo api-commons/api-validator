@@ -8,7 +8,7 @@
   "scripts": {
     "compile-rules": "node tools/compile-rules.mjs",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node tools/zip-dist.mjs",
     "preview": "vite preview",
     "check:rulesets": "tsx tools/check-rulesets.ts",
     "check": "npm run check:rulesets"
