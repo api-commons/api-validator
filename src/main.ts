@@ -252,14 +252,14 @@ function activeRulesetDef(): any {
     if (t.includes('duplicate:true')) continue;
     rules[name] = engineRule(rule);
   }
-  // Built-in (extended) rules: we don't support Swagger / OpenAPI 2.0, so turn off
-  // any oas2 rules; every other active (recommended) built-in is re-leveled to
-  // `warn` so the whole ruleset reports at a single severity. Non-recommended
-  // built-ins are left dormant (not enabled just to re-level them).
+  // Built-in (extended) rules: every active (recommended) built-in — including the
+  // Swagger / OpenAPI 2.0 (oas2) rules, now that Swagger is supported — is re-leveled
+  // to `warn` so the whole ruleset reports at a single severity. Spectral only runs
+  // the rules whose format matches the document, so the oas2 and oas3 built-ins
+  // coexist safely. Non-recommended built-ins are left dormant.
   const recommended = new Set(builtinRecommendedByFormat[current.format] ?? []);
   for (const name of builtinRulesByFormat[current.format] ?? []) {
-    if (/^oas2[-_]/i.test(name)) rules[name] = 'off';
-    else if (recommended.has(name)) rules[name] = 'warn';
+    if (recommended.has(name)) rules[name] = 'warn';
   }
   // saved rule overrides for this format take priority over the originals
   const isInline = (name: string) => !!ALL_RULES[current.format]?.[name] && ALL_RULES[current.format][name].source !== 'builtin';
@@ -782,14 +782,17 @@ function rulesForArtifact(a: ArtifactType): Array<{ name: string; category: stri
   };
   for (const [name, rule] of Object.entries(ALL_RULES[a.format] || {})) add(name, rule);
   for (const name of builtinRulesByFormat[a.format] ?? []) {
-    if (/^oas2[-_]/i.test(name)) continue; // no Swagger support
     add(name, RULE_INDEX[name] || null);
   }
   return list.sort((x, y) => x.name.localeCompare(y.name));
 }
 function renderRuleset() {
-  // apply the active tag filter, then drop artifacts left with no matching rules
+  // apply the active tag filter, then drop artifacts left with no matching rules.
+  // Dedupe by format so OpenAPI and Swagger 2.0 (which share the `openapi` ruleset)
+  // don't render the same rules under two headings.
+  const seenFormats = new Set<string>();
   const arts = ARTIFACTS
+    .filter((a) => !seenFormats.has(a.format) && seenFormats.add(a.format))
     .map((a) => ({ a, rules: rulesForArtifact(a).filter((r) => ruleMatchesFilter(tagsFor(r.name))) }))
     .filter((x) => x.rules.length);
   const validIds = new Set(arts.map((x) => x.a.id));

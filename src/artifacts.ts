@@ -1,7 +1,7 @@
 // The artifact types the validator supports. Each maps to a `format` tag used to
 // select rules, a starter Spectral ruleset (rules/defaults/<id>.yaml), and a
-// starter sample (samples/<id>.yaml). Scope is intentionally narrow: OpenAPI,
-// AsyncAPI, Arazzo, and JSON Schema only.
+// starter sample (samples/<id>.yaml). Scope: OpenAPI (3.x) and Swagger 2.0,
+// AsyncAPI, Arazzo, and JSON Schema.
 import { parse as parseYaml } from 'yaml';
 
 export interface ArtifactType {
@@ -11,9 +11,11 @@ export interface ArtifactType {
   searchNote?: string; // shown when a code search returns nothing
 }
 
-// Order as requested.
+// Order as requested. OpenAPI and Swagger 2.0 share the `openapi` format (and its
+// ruleset); Spectral auto-detects the document version and runs the matching rules.
 export const ARTIFACTS: ArtifactType[] = [
   { id: 'openapi', label: 'OpenAPI', format: 'openapi' },
+  { id: 'swagger', label: 'Swagger 2.0', format: 'openapi' },
   { id: 'asyncapi', label: 'AsyncAPI', format: 'asyncapi' },
   { id: 'arazzo', label: 'Arazzo', format: 'arazzo' },
   { id: 'json-schema', label: 'JSON Schema', format: 'jsonschema' },
