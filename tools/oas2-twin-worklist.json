@@ -1,0 +1,339 @@
+[
+  {
+    "name": "document-owasp-api9-server",
+    "kind": "servers-twin",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "document-require-openapi",
+    "kind": "review",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "document-require-server-defined",
+    "kind": "servers-twin",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "document-require-webhooks",
+    "kind": "review",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "info-require-openapi-version-3x",
+    "kind": "review",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "oas3_1-callbacks-in-webhook",
+    "kind": "review",
+    "given": [
+      "$.webhooks[*][*].callbacks"
+    ]
+  },
+  {
+    "name": "oas3_1-servers-in-webhook",
+    "kind": "servers-twin",
+    "given": [
+      "$.webhooks.servers",
+      "$.webhooks[*][*].servers"
+    ]
+  },
+  {
+    "name": "oas3-api-servers",
+    "kind": "servers-twin",
+    "given": [
+      "$"
+    ]
+  },
+  {
+    "name": "oas3-server-not-example.com",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[*].url"
+    ]
+  },
+  {
+    "name": "oas3-server-trailing-slash",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[*].url"
+    ]
+  },
+  {
+    "name": "oas3-server-variables",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[*]",
+      "#PathItem.servers[*]",
+      "#OperationObject.servers[*]",
+      "#LinkObject.server"
+    ]
+  },
+  {
+    "name": "oas3-valid-media-example",
+    "kind": "response-content-twin",
+    "given": [
+      "$..content..[?(@ && @.schema && (@.example !== void 0 || @.examples))]",
+      "$..headers..[?(@ && @.schema && (@.example !== void 0 || @.examples))]",
+      "$..parameters..[?(@ && @.schema && (@.example !== void 0 || @.examples))]"
+    ]
+  },
+  {
+    "name": "operation-patch-must-have-request-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[*].patch"
+    ]
+  },
+  {
+    "name": "operation-post-require-request-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths.*.post"
+    ]
+  },
+  {
+    "name": "parameter-require-schema",
+    "kind": "param-schema-twin",
+    "given": [
+      "$.components.parameters.*"
+    ]
+  },
+  {
+    "name": "request-body-must-use-json-content-type",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths.*[post,put,patch].requestBody.content"
+    ]
+  },
+  {
+    "name": "request-delete-must-not-have-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[*].delete.requestBody"
+    ]
+  },
+  {
+    "name": "request-get-must-not-have-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[*][get].requestBody"
+    ]
+  },
+  {
+    "name": "request-head-must-not-have-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[*][head].requestBody"
+    ]
+  },
+  {
+    "name": "request-options-must-not-have-body",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[*][options].requestBody"
+    ]
+  },
+  {
+    "name": "request-post-collection-require-paging-object",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths[?(!@property.match(/.*\\/\\{[^}]+\\}$/))].post.requestBody.content.application/json.schema.properties.paging"
+    ]
+  },
+  {
+    "name": "request-property-names-camel-case",
+    "kind": "requestBody-twin",
+    "given": [
+      "$.paths.*.*[responses,requestBody]..content..schema..properties.*~"
+    ]
+  },
+  {
+    "name": "response-body-must-be-object",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths[*][*].responses[*].content.application/json.schema.type"
+    ]
+  },
+  {
+    "name": "response-collection-require-results-array",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths[?(!@property.match(/.*\\/\\{[^}]+\\}$/))].get.responses['200'].content.application/json.schema.properties.results"
+    ]
+  },
+  {
+    "name": "response-collection-support-paging",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths[?(!@property.match(/.*\\/\\{[^}]+\\}.*$/))].get.responses['200'].content.application/json.schema.properties"
+    ]
+  },
+  {
+    "name": "response-delete-must-not-return-body",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.*.delete.responses[202,204].content"
+    ]
+  },
+  {
+    "name": "response-error-use-problem-type-2",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths...responses[?(@property.match(/^(4|5)/))].content.*~"
+    ]
+  },
+  {
+    "name": "response-get-must-return-body",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths[*].get.responses[*]"
+    ]
+  },
+  {
+    "name": "response-head-must-not-return-body",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.*.head.responses[200].content"
+    ]
+  },
+  {
+    "name": "response-must-use-json-content-type",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.*[get,post,put,patch,delete].responses[*].content"
+    ]
+  },
+  {
+    "name": "response-options-must-not-return-body",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.*.options.responses[200, 204].content"
+    ]
+  },
+  {
+    "name": "response-status-path-problem-schema-fields",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.'/status'.get.responses.200.content.[[schema]]"
+    ]
+  },
+  {
+    "name": "response-status-path-return-problem-type",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths.'/status'.get.responses.200.content.*~"
+    ]
+  },
+  {
+    "name": "response-use-standard-mime-types",
+    "kind": "response-content-twin",
+    "given": [
+      "$.paths[*][*].responses[*].content.*~"
+    ]
+  },
+  {
+    "name": "security-bearer-scheme-require-bearer-format",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'http' && @.scheme == 'bearer')]"
+    ]
+  },
+  {
+    "name": "security-no-http-basic-auth",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[*]"
+    ]
+  },
+  {
+    "name": "security-oauth-flow-require-scopes",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'oauth2')].flows[*]"
+    ]
+  },
+  {
+    "name": "security-openidconnect-require-url",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'openIdConnect')]"
+    ]
+  },
+  {
+    "name": "security-openidconnect-url-https",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'openIdConnect')].openIdConnectUrl"
+    ]
+  },
+  {
+    "name": "security-owasp-api2-auth-insecure-schemes",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'http')].scheme"
+    ]
+  },
+  {
+    "name": "security-owasp-api2-no-api-keys-in-url",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[?(@ && @.type == 'apiKey')]"
+    ]
+  },
+  {
+    "name": "security-scheme-require-description",
+    "kind": "security-twin",
+    "given": [
+      "$.components.securitySchemes[*]"
+    ]
+  },
+  {
+    "name": "server-require-description",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[*]",
+      "$.paths..servers"
+    ]
+  },
+  {
+    "name": "server-require-https-2",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[?(@[\"x-sandbox\"] != true)]",
+      "$.paths..servers[?(@[\"x-sandbox\"] != true)]"
+    ]
+  },
+  {
+    "name": "server-url-include-version",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers"
+    ]
+  },
+  {
+    "name": "server-url-meet-standards",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers"
+    ]
+  },
+  {
+    "name": "server-url-require-https",
+    "kind": "servers-twin",
+    "given": [
+      "$.servers[*]"
+    ]
+  }
+]

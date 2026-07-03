@@ -79,10 +79,10 @@ function resolveFunctions(then, srcId, used) {
   return true;
 }
 
-// strip source-identifying tokens (sources bake their name in) and OAS version
-// tokens (oas2/oas3 — we don't support Swagger and don't want oas3 in names).
+// strip source-identifying tokens (sources bake their name in). Keep oas2/oas3
+// tokens — they distinguish the format twins used for Swagger 2.0 ↔ 3.x parity.
 const SOURCE_TOKENS = new Set(['adidas', 'baloise', 'sps', 'tas', 'trimble', 'microcks', 'paystack', 'schwarz', 'italia', 'teamdigitale', 'digitalocean', 'spscommerce']);
-const STRIP_TOKENS = new Set([...SOURCE_TOKENS, 'oas2', 'oas3']);
+const STRIP_TOKENS = new Set([...SOURCE_TOKENS]);
 function cleanName(name) {
   const parts = name.split('-').filter((p) => !STRIP_TOKENS.has(p.toLowerCase()));
   const r = parts.join('-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');
@@ -147,16 +147,10 @@ function addSource(srcId, format, rulesObj, fileHint, dropFn) {
     if (rule === false || rule === 'off') continue;
     if (typeof rule !== 'object' || rule === null) continue;
     if (dropFn && dropFn(origName)) { stats[srcId].dropped++; continue; }
-    // We don't support Swagger / OpenAPI 2.0: drop oas2-named rules and strip
-    // oas2 from formats; if a rule was oas2-only, drop it.
-    if (/^oas2[-_]/i.test(origName)) { stats[srcId].dropped++; continue; }
+    // Swagger / OpenAPI 2.0 is a first-class target now — keep oas2-named rules
+    // and oas2 in formats so the ruleset reaches parity with OpenAPI 3.x.
     const clean = {};
     for (const [k, v] of Object.entries(rule)) if (VALID.has(k) || k.startsWith('x-')) clean[k] = structuredClone(v);
-    if (Array.isArray(clean.formats)) {
-      const had = clean.formats.length;
-      clean.formats = clean.formats.filter((f) => !/^oas2(\.0)?$|^swagger/i.test(String(f)));
-      if (had > 0 && clean.formats.length === 0) { stats[srcId].dropped++; continue; }
-    }
     if (clean.then !== undefined && !resolveFunctions(clean.then, srcId, usedCustom)) { stats[srcId].skipped++; continue; }
 
     const sig = JSON.stringify([clean.given, clean.then]);
@@ -282,11 +276,44 @@ components:
         name:
           type: string
 `;
+// a clean Swagger / OpenAPI 2.0 document, so oas2-format rules are exercised
+// (constructed + linted) during the runtime prune rather than silently dropped.
+const SAMPLE_OAS2 = `swagger: "2.0"
+info: { title: Sample, version: "1.0.0", description: d, contact: { name: n, url: "https://e.co" }, license: { name: MIT } }
+host: api.example.com
+basePath: /v1
+schemes: [https]
+consumes: [application/json]
+produces: [application/json]
+tags: [{ name: pets, description: p }]
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: s
+      tags: [pets]
+      parameters: [{ name: limit, in: query, type: integer }]
+      responses: { "200": { description: ok, schema: { $ref: "#/definitions/Pet" } } }
+    post:
+      operationId: createPet
+      summary: s
+      tags: [pets]
+      parameters: [{ name: body, in: body, required: true, schema: { $ref: "#/definitions/Pet" } }]
+      responses: { "201": { description: created } }
+securityDefinitions:
+  bearer: { type: apiKey, name: Authorization, in: header }
+definitions:
+  Pet: { type: object, properties: { id: { type: integer }, name: { type: string } }, required: [id] }
+`;
+// NOTE: SAMPLE_OAS2 is intentionally NOT in the destructive prune set yet — an
+// untagged 3.x-structure rule throws on a 2.0 doc and would be wrongly pruned.
+// During the parity port, 3.x-only rules get `formats: [oas3]` and oas2 rules get
+// `formats: [oas2]`; once tagged, re-add SAMPLE_OAS2 here as a regression guard.
 const SAMPLES_DOC = [PETSTORE, SAMPLE];
 const Yaml = parsers.Yaml;
 async function lints(rules, withOas) {
   try {
-    const sp = new core.Spotlight();
+    const sp = new core.Spectral();
     const def = withOas ? { ...toJs({ rules }), extends: [[oas, 'recommended']] } : toJs({ rules });
     sp.setRuleset(new core.Ruleset(def, { source: 'rt' }));
     for (const s of SAMPLES_DOC) await sp.run(new core.Document(s, Yaml, 'sample.yaml'));
