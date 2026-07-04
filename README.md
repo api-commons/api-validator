@@ -97,6 +97,14 @@ rule overrides are stored only in your browser's local storage and are sent
 directly from your browser to GitHub/GitLab/Bitbucket when you use those features —
 never to any API Validator server (there isn't one). **Reset** clears it all.
 
+## The tags, and the why
+
+The rule catalog's tag vocabulary — `format:` / `experience:` / `spec:` / `topic:` /
+`owasp:` — is the canonical reference in [`rules/TAG-TAXONOMY.md`](./rules/TAG-TAXONOMY.md);
+filter and group rules by any of them. Each rule is a machine-executable check; for the
+human *why* behind them, see the [governance guidance](https://guidance.apievangelist.com/store/rules/)
+at guidance.apievangelist.com.
+
 ---
 
 A project of [API Evangelist](https://apievangelist.com), maintained openly under
