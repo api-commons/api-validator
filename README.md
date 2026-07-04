@@ -31,8 +31,9 @@ Part of the [API Commons](https://apicommons.org/tools/) tools, alongside
 - **Powered by Spectral** — runs the published `@stoplight/spectral-*` engine
   entirely in the browser. OpenAPI and AsyncAPI extend Spectral's built-in
   `spectral:oas` / `spectral:asyncapi` rulesets; Arazzo and JSON Schema are
-  linted by the curated inline rules. All rules report at a single **`warn`**
-  severity by default.
+  linted by the curated inline rules. Every rule ships at **`info`** — the goal
+  is to educate, not block; raise individual rules to `warn`/`error` for the
+  conventions you choose to enforce.
 - **Search GitHub / GitLab / Bitbucket** — pick an artifact type, search code
   across your Git host with your own token, and load any result straight into the
   editor. GitHub is on by default; GitLab and Bitbucket are opt-in.
