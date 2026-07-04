@@ -74,6 +74,6 @@ export function buildApisJson(collectionName: string, artifacts: ArtifactInput[]
   };
   if (apis.length) doc.apis = apis;
   if (common.length) doc.common = common;
-  doc.rules = [{ type: 'SpectralRules', name: 'Spotlight Rules', url: 'https://spotlight-rules.com/spec/' }];
+  doc.rules = [{ type: 'SpectralRules', name: 'API Commons Rules', url: 'https://apicommons.org/rules/' }];
   return stringify(doc);
 }
