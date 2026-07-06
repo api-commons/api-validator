@@ -4,7 +4,7 @@ import * as monaco from 'monaco-editor';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker&inline';
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker&inline';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { lint, builtinDescriptions, builtinRulesByFormat, builtinRecommendedByFormat } from './spectral';
+import { lint, builtinDescriptions, builtinRulesByFormat, builtinRecommendedByFormat, builtinFormatsByName } from './spectral';
 import { ARTIFACTS, SAMPLES, artifactById, type ArtifactType } from './artifacts';
 import allRulesRaw from './all-rules.json';
 import { searchSource, loadHit, enabledSources, type Hit, type SourceId, type Tokens } from './sources';
@@ -49,6 +49,28 @@ for (const [fmt, rules] of Object.entries(ALL_RULES)) for (const [name, r] of Ob
 const EXTENDS_FOR: Record<string, string> = { openapi: 'spectral:oas', asyncapi: 'spectral:asyncapi' };
 // strip catalog-only metadata the lint engine doesn't understand
 function engineRule(r: any): any { const { source, title, reference, prompt, _format, ...rest } = r; return rest; }
+
+// ---- OpenAPI major grouping (Swagger 2.0 vs OpenAPI 3.x) --------------------
+// A rule's OpenAPI major(s), as `oas2`/`oas3` tokens. Catalog rules carry an
+// explicit `formats` array (empty/absent = format-agnostic); pure built-in rules
+// (only reached via `extends`) are classified in spectral.ts. A catalog entry
+// always wins so an agnostic curated rule isn't mistaken for a same-named built-in.
+function formatTokensFor(name: string, rule?: any): string[] {
+  const cat = rule ?? RULE_INDEX[name];
+  if (cat) return Array.isArray(cat.formats) ? cat.formats.map(String) : [];
+  return builtinFormatsByName[name] ?? [];
+}
+// Does a rule belong to an artifact's group? Non-OpenAPI artifacts (no oasVersion)
+// take every rule of their format. For the two OpenAPI artifacts, a rule applies
+// when it targets that major, or when it is format-agnostic (fires on both).
+function ruleAppliesToArtifact(name: string, rule: any, a: ArtifactType): boolean {
+  if (!a.oasVersion) return true;
+  const toks = formatTokensFor(name, rule);
+  if (!toks.length) return true; // format-agnostic → both 2.0 and 3.x
+  return a.oasVersion === 'oas2'
+    ? toks.some((t) => t.includes('oas2'))
+    : toks.some((t) => t.includes('oas3'));
+}
 
 // ---- state ------------------------------------------------------------------
 let current: ArtifactType = artifactById('openapi');
@@ -245,21 +267,25 @@ function applyFilterToView() {
 // ---- active ruleset ---------------------------------------------------------
 function activeRulesetDef(): any {
   const rules: Record<string, any> = {};
-  // catalog rules for this format (built-ins come via `extends`, not the data form)
+  // catalog rules for this format (built-ins come via `extends`, not the data form).
+  // For the OpenAPI artifacts, keep only the rules that apply to the selected major
+  // (Swagger 2.0 vs OpenAPI 3.x) so the active ruleset — and its count — reflects
+  // the chosen grouping rather than the whole shared `openapi` format.
   for (const [name, rule] of Object.entries(ALL_RULES[current.format] || {})) {
     if ((rule as any).source === 'builtin') continue;
     const t: string[] = Array.isArray((rule as any).tags) ? (rule as any).tags : [];
     if (t.includes('duplicate:true')) continue;
+    if (!ruleAppliesToArtifact(name, rule, current)) continue;
     rules[name] = engineRule(rule);
   }
-  // Built-in (extended) rules: every active (recommended) built-in — including the
-  // Swagger / OpenAPI 2.0 (oas2) rules, now that Swagger is supported — is re-leveled
-  // to `warn` so the whole ruleset reports at a single severity. Spectral only runs
-  // the rules whose format matches the document, so the oas2 and oas3 built-ins
-  // coexist safely. Non-recommended built-ins are left dormant.
+  // Built-in (extended) rules: every active (recommended) built-in that applies to
+  // the selected major is re-leveled to `warn` so the whole ruleset reports at a
+  // single severity. Spectral only runs rules whose format matches the document, so
+  // the oas2 and oas3 built-ins coexist safely; version-filtering here keeps the
+  // active count honest. Non-recommended built-ins are left dormant.
   const recommended = new Set(builtinRecommendedByFormat[current.format] ?? []);
   for (const name of builtinRulesByFormat[current.format] ?? []) {
-    if (recommended.has(name)) rules[name] = 'warn';
+    if (recommended.has(name) && ruleAppliesToArtifact(name, null, current)) rules[name] = 'warn';
   }
   // saved rule overrides for this format take priority over the originals
   const isInline = (name: string) => !!ALL_RULES[current.format]?.[name] && ALL_RULES[current.format][name].source !== 'builtin';
@@ -780,19 +806,23 @@ function rulesForArtifact(a: ArtifactType): Array<{ name: string; category: stri
     if (!exp && BUILTIN_META[name]?.experience?.[0]) exp = `experience:${BUILTIN_META[name].experience[0]}`;
     list.push({ name, category: (exp ?? 'experience:other').split(':').slice(1).join(':') });
   };
-  for (const [name, rule] of Object.entries(ALL_RULES[a.format] || {})) add(name, rule);
+  for (const [name, rule] of Object.entries(ALL_RULES[a.format] || {})) {
+    if (ruleAppliesToArtifact(name, rule, a)) add(name, rule);
+  }
   for (const name of builtinRulesByFormat[a.format] ?? []) {
-    add(name, RULE_INDEX[name] || null);
+    if (ruleAppliesToArtifact(name, RULE_INDEX[name] || null, a)) add(name, RULE_INDEX[name] || null);
   }
   return list.sort((x, y) => x.name.localeCompare(y.name));
 }
 function renderRuleset() {
   // apply the active tag filter, then drop artifacts left with no matching rules.
-  // Dedupe by format so OpenAPI and Swagger 2.0 (which share the `openapi` ruleset)
-  // don't render the same rules under two headings.
-  const seenFormats = new Set<string>();
+  // Dedupe by grouping key, not raw format: OpenAPI 3.x and Swagger 2.0 share the
+  // `openapi` format but are distinct groups (each shows only its major's rules),
+  // so they render under two headings while other formats stay single.
+  const groupKey = (a: ArtifactType) => (a.oasVersion ? `${a.format}:${a.oasVersion}` : a.format);
+  const seenGroups = new Set<string>();
   const arts = ARTIFACTS
-    .filter((a) => !seenFormats.has(a.format) && seenFormats.add(a.format))
+    .filter((a) => !seenGroups.has(groupKey(a)) && seenGroups.add(groupKey(a)))
     .map((a) => ({ a, rules: rulesForArtifact(a).filter((r) => ruleMatchesFilter(tagsFor(r.name))) }))
     .filter((x) => x.rules.length);
   const validIds = new Set(arts.map((x) => x.a.id));
@@ -939,7 +969,8 @@ function detectArtifactType(text: string): string | null {
   let d: any;
   try { d = parseYaml(text); } catch { return null; }
   if (!d || typeof d !== 'object') return null;
-  if (d.openapi || d.swagger) return 'openapi';
+  if (d.swagger) return 'swagger'; // Swagger 2.0 → its own grouping (oas2 rules)
+  if (d.openapi) return 'openapi'; // OpenAPI 3.x
   if (d.asyncapi) return 'asyncapi';
   if (d.arazzo) return 'arazzo';
   if (d.$schema || d.$defs || d.definitions || d.properties || d.$id) return 'json-schema';

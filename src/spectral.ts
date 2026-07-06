@@ -49,6 +49,30 @@ export const builtinRecommendedByFormat: Record<string, string[]> = {
   asyncapi: recommendedNames(asyncapi),
 };
 
+// Which OpenAPI major(s) each built-in oas rule targets, so the UI can split the
+// `openapi` format into the Swagger 2.0 (oas2) and OpenAPI 3.x (oas3) groups the
+// same way the catalog's `formats` field does. A rule's `formats` are opaque
+// matcher functions (not identity-comparable to the exported ones), so we classify
+// by *calling* each one against a minimal 2.0 / 3.x document. Empty array = the
+// rule declares no formats and therefore applies to every OpenAPI document.
+const OAS2_DOC = { swagger: '2.0' } as const;
+const OAS30_DOC = { openapi: '3.0.0' } as const;
+const OAS31_DOC = { openapi: '3.1.0' } as const;
+function classifyFormats(formats: unknown): string[] {
+  if (!Array.isArray(formats)) return [];
+  const toks = new Set<string>();
+  for (const f of formats) {
+    if (typeof f !== 'function') continue;
+    try { if ((f as any)(OAS2_DOC, null)) toks.add('oas2'); } catch { /* not this format */ }
+    try { if ((f as any)(OAS30_DOC, null) || (f as any)(OAS31_DOC, null)) toks.add('oas3'); } catch { /* not this format */ }
+  }
+  return [...toks];
+}
+export const builtinFormatsByName: Record<string, string[]> = {};
+for (const [name, rule] of Object.entries<any>((oas as any)?.rules ?? {})) {
+  builtinFormatsByName[name] = classifyFormats(rule?.formats);
+}
+
 // Normalize ruleset format strings to the format-function export names.
 const FORMAT_ALIASES: Record<string, string> = {
   'oas3.0': 'oas3_0', 'oas3.1': 'oas3_1', oas31: 'oas3_1', oas30: 'oas3_0',

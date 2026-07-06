@@ -41,8 +41,14 @@ for (const pair of oa.items) {
   const fo = JSON.stringify(r.then || '');
   const has = (rx) => rx.test(joined);
   const thenIs3x = tf.some((f) => OAS3_THEN_FIELDS.has(f)) || /servers|requestBody/.test(fo);
+  // A multi-path rule already broadened to fire on BOTH majors (its given carries a
+  // 3.x path AND a 2.0 path, e.g. [components.parameters.*, parameters.*]) must stay
+  // format-agnostic. Tagging it `oas2` because a 2.0 token appears would stop it
+  // firing on 3.x. So only treat a rule as 2.0-only when it references NO 3.x path.
+  const refs3xPath = RX.security.test(joined) || RX.schemas.test(joined)
+    || RX.compParams.test(joined) || RX.compResponses.test(joined) || RX.oas3Given.test(joined);
 
-  if (has(RX.oas2)) { actions.set(name, { tag: 'oas2' }); continue; }
+  if (has(RX.oas2) && !refs3xPath) { actions.set(name, { tag: 'oas2' }); continue; }
   if (has(RX.security)) { actions.set(name, { tag: 'oas3' }); worklist.push({ name, kind: 'security-twin', given: gs }); continue; }
   if (has(RX.schemas)) { actions.set(name, { broaden: ['components.schemas', 'definitions'] }); continue; }
   if (has(RX.compParams)) {

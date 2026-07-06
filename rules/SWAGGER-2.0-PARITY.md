@@ -2,6 +2,14 @@
 
 The API Commons governance rules must apply to **Swagger / OpenAPI 2.0** with parity to **OpenAPI 3.x**. Spectral auto-detects a document's format (`swagger: "2.0"` → `oas2`; `openapi: 3.x` → `oas3`/`oas3_0`/`oas3_1`) and only runs a rule on a document whose format is in the rule's `formats` (or on every document when a rule declares no `formats`). This doc is the authoritative reference for porting.
 
+## Status (current)
+
+**The port is complete.** In the runtime catalog (`src/all-rules.json`, mirrored by `rules/all-rules.yaml`) the `openapi` group is fully format-scoped: **46 `oas2` twins**, **134 `oas3`-only** rules, **282 format-agnostic** rules. That means **328 rules fire on a Swagger 2.0 document** (twins + agnostic) and **416 on OpenAPI 3.x**. `tools/oas2-parity.mjs` reports an **empty twin worklist** and zero untagged 3.x-structure rules (no misfire risk on 2.0). The rules still tagged `oas3`-only with no 2.0 twin are genuine 3.x-only concepts (webhooks, `servers.variables`, `openIdConnect`, the `http`/`bearer` security-scheme shape) — correct to leave un-twinned.
+
+Swagger 2.0 is also an **explicit grouping in the app**, not just a `formats` tag Spectral resolves at lint time. `src/artifacts.ts` gives the two OpenAPI artifacts an `oasVersion` (`oas2` / `oas3`); `src/main.ts` uses it to (a) select only the matching major's rules when building the active ruleset for validation, and (b) render **OpenAPI 3.x** and **Swagger 2.0** as separate, separately-toggleable groups in the Rules tab. Built-in `spectral:oas` rules are classified oas2/oas3 in `src/spectral.ts` (`builtinFormatsByName`) by calling each rule's format matcher against a minimal 2.0/3.x document. Pasting or uploading a `swagger: "2.0"` document auto-selects the Swagger 2.0 grouping (`detectArtifactType`).
+
+> Tooling note: `oas2-parity.mjs` previously mis-tagged **broadened multi-path** rules (a `given` carrying both a 3.x and a 2.0 path, e.g. `[components.parameters.*, parameters.*]`) as `oas2`-only, which would have stopped them firing on 3.x. Fixed — it now only tags a rule `oas2` when its `given` references no 3.x path. It is idempotent and a no-op against the current (complete) ruleset.
+
 ## Porting strategy (in priority order)
 
 1. **Broaden the `given` to a multi-path array** when the same `then` check is valid for both formats. One rule, no `formats`, fires on whichever path exists. Preferred — keeps rule count and names clean.
