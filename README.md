@@ -11,12 +11,6 @@ governs Swagger / OpenAPI **2.0** documents exactly as it governs 3.x — Spectr
 auto-detects each document's format and applies the matching rules, so nothing
 false-positives across versions.
 
-Part of the [API Commons](https://apicommons.org/tools/) tools, alongside
-[API Discovery](https://github.com/api-commons/api-discovery),
-[API Documentation](https://github.com/api-commons/api-documentation),
-[API Reusability](https://github.com/api-commons/api-reusability), and
-[MCP Install](https://github.com/api-commons/mcp-install).
-
 ## Features
 
 - **Four artifact types, on purpose** — OpenAPI (both **3.x** and **Swagger
@@ -104,6 +98,17 @@ The rule catalog's tag vocabulary — `format:` / `experience:` / `spec:` / `top
 filter and group rules by any of them. Each rule is a machine-executable check; for the
 human *why* behind them, see the [governance guidance](https://guidance.apievangelist.com/store/rules/)
 at guidance.apievangelist.com.
+
+## Part of API Commons
+
+An open, browser-first tool from **[API Commons](https://apicommons.org)** — free, no backend, your data stays in your browser. Browse the full set at **[apicommons.org/tools](https://apicommons.org/tools/)**.
+
+**Related tools**
+- [API Governance MCP](https://github.com/api-commons/api-governance-mcp) — the same Spectral governance as an MCP server for any AI client
+- [Ruleset Commons](https://rulesets.apicommons.org) — adopt a provenanced ruleset by reference
+- [Spectral Ruleset Studio](https://studio.apicommons.org) — turn a style guide into an owned ruleset
+- [Governance Coverage](https://coverage.apicommons.org) — how much of your API your rules actually check
+- [Spectral Reporter](https://reporter.apicommons.org) — Spectral JSON → self-contained HTML report
 
 ---
 
